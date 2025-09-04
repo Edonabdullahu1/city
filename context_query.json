@@ -1,0 +1,7 @@
+{
+  "requesting_agent": "security-auditor",
+  "request_type": "get_task_briefing",
+  "payload": {
+    "query": "Initial briefing required for security assessment. Provide overview of authentication methods, security configurations, sensitive data handling, and relevant security files."
+  }
+}

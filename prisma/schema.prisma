@@ -1,0 +1,563 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String         @id @default(cuid())
+  email     String         @unique
+  password  String
+  firstName String?
+  lastName  String?
+  role      UserRole       @default(USER)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  accounts  Account[]
+  auditLogs BookingAudit[]
+  bookings  Booking[]
+  sessions  Session[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model Booking {
+  id                String             @id @default(cuid())
+  reservationCode   String             @unique
+  userId            String
+  status            BookingStatus      @default(SOFT)
+  totalAmount       Int
+  currency          String             @default("EUR")
+  customerName      String?
+  customerEmail     String?
+  customerPhone     String?
+  checkInDate       DateTime?
+  checkOutDate      DateTime?
+  destinationCityId String?
+  notes             String?
+  expiresAt         DateTime?
+  confirmedAt       DateTime?
+  paidAt            DateTime?
+  cancelledAt       DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  auditLogs         BookingAudit[]
+  destinationCity   City?              @relation(fields: [destinationCityId], references: [id])
+  user              User               @relation(fields: [userId], references: [id])
+  excursions        ExcursionBooking[]
+  flights           FlightBooking[]
+  hotels            HotelBooking[]
+  packages          PackageBooking[]
+  transfers         TransferBooking[]
+
+  @@index([destinationCityId])
+  @@map("bookings")
+}
+
+model Hotel {
+  id            String         @id @default(cuid())
+  name          String
+  address       String
+  cityId        String
+  category      String
+  rating        Int
+  description   String
+  amenities     String[]
+  active        Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  hotelId       Int?           @unique
+  slug          String?        @unique
+  primaryImage  String?
+  images        Json?          @default("[]")
+  blackoutDates BlackoutDate[]
+  bookings      HotelBooking[]
+  hotelPrices   HotelPrice[]
+  city          City           @relation("HotelCity", fields: [cityId], references: [id])
+  packages      Package[]
+  rooms         Room[]
+
+  @@index([cityId])
+  @@index([hotelId])
+  @@map("hotels")
+}
+
+model Room {
+  id           String             @id @default(cuid())
+  hotelId      String
+  type         String
+  capacity     Int
+  basePrice    Int
+  totalRooms   Int
+  amenities    String[]
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  packages     Package[]
+  availability RoomAvailability[]
+  hotel        Hotel              @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  @@map("rooms")
+}
+
+model RoomAvailability {
+  id             String   @id @default(cuid())
+  roomId         String
+  date           DateTime @db.Date
+  availableRooms Int
+  bookedRooms    Int      @default(0)
+  priceOverride  Int?
+  isBlocked      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  room           Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, date])
+  @@index([date])
+  @@map("room_availability")
+}
+
+model BlackoutDate {
+  id        String   @id @default(cuid())
+  hotelId   String
+  date      DateTime @db.Date
+  reason    String?
+  createdAt DateTime @default(now())
+  hotel     Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  @@unique([hotelId, date])
+  @@map("blackout_dates")
+}
+
+model HotelPrice {
+  id            String   @id @default(cuid())
+  hotelId       String
+  board         String
+  roomType      String
+  fromDate      DateTime @db.Date
+  tillDate      DateTime @db.Date
+  single        Decimal  @db.Decimal(10, 2)
+  double        Decimal  @db.Decimal(10, 2)
+  extraBed      Decimal  @db.Decimal(10, 2)
+  payingKidsAge String
+  paymentKids   Decimal  @db.Decimal(10, 2)
+  importBatchId String
+  createdAt     DateTime @default(now())
+  hotel         Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  @@index([hotelId, fromDate, tillDate])
+  @@index([importBatchId])
+  @@map("hotel_prices")
+}
+
+model Flight {
+  id                 String          @id @default(cuid())
+  flightNumber       String
+  originCityId       String
+  destinationCityId  String
+  departureAirportId String
+  arrivalAirportId   String
+  departureTime      DateTime
+  arrivalTime        DateTime
+  totalSeats         Int
+  availableSeats     Int
+  pricePerSeat       Int
+  isBlockSeat        Boolean         @default(true)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  airlineId          String
+  blockGroupId       String?
+  isReturn           Boolean         @default(false)
+  bookings           FlightBooking[]
+  airline            Airline         @relation(fields: [airlineId], references: [id])
+  arrivalAirport     Airport         @relation("FlightArrivalAirport", fields: [arrivalAirportId], references: [id])
+  departureAirport   Airport         @relation("FlightDepartureAirport", fields: [departureAirportId], references: [id])
+  destinationCity    City            @relation("FlightDestination", fields: [destinationCityId], references: [id])
+  originCity         City            @relation("FlightOrigin", fields: [originCityId], references: [id])
+  departurePackages  Package[]       @relation("PackageDeparture")
+  returnPackages     Package[]       @relation("PackageReturn")
+
+  @@unique([flightNumber, departureTime])
+  @@index([airlineId])
+  @@index([originCityId])
+  @@index([destinationCityId])
+  @@index([departureAirportId])
+  @@index([arrivalAirportId])
+  @@map("flights")
+}
+
+model Airline {
+  id        String   @id @default(cuid())
+  name      String
+  iataCode  String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  flights   Flight[]
+
+  @@map("airlines")
+}
+
+model Transfer {
+  id          String            @id @default(cuid())
+  name        String
+  fromCityId  String
+  toCityId    String
+  fromType    String
+  toType      String
+  vehicleType String
+  capacity    Int
+  price       Int
+  duration    Int
+  description String?
+  active      Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  packages    Package[]
+  bookings    TransferBooking[]
+  fromCity    City              @relation("TransferFrom", fields: [fromCityId], references: [id])
+  toCity      City              @relation("TransferTo", fields: [toCityId], references: [id])
+
+  @@index([fromCityId])
+  @@index([toCityId])
+  @@map("transfers")
+}
+
+model Excursion {
+  id                String             @id @default(cuid())
+  title             String
+  description       String
+  cityId            String
+  duration          Int
+  price             Int
+  capacity          Int
+  meetingPoint      String
+  includes          String[]
+  excludes          String[]
+  images            String[]
+  active            Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  bookings          ExcursionBooking[]
+  city              City               @relation(fields: [cityId], references: [id])
+  packageExcursions PackageExcursion[]
+
+  @@index([cityId])
+  @@map("excursions")
+}
+
+model FlightBooking {
+  id            String    @id @default(cuid())
+  bookingId     String
+  flightId      String?
+  flightNumber  String?
+  origin        String
+  destination   String
+  departureDate DateTime
+  returnDate    DateTime?
+  passengers    Int       @default(1)
+  class         String    @default("Economy")
+  price         Int
+  bookingNumber String?
+  isBlockSeat   Boolean   @default(false)
+  serpApiData   Json?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  booking       Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  flight        Flight?   @relation(fields: [flightId], references: [id])
+
+  @@map("flight_bookings")
+}
+
+model HotelBooking {
+  id              String   @id @default(cuid())
+  bookingId       String
+  hotelId         String?
+  hotelName       String
+  roomId          String?
+  roomType        String
+  location        String
+  checkIn         DateTime
+  checkOut        DateTime
+  occupancy       Int
+  nights          Int
+  pricePerNight   Int
+  totalPrice      Int
+  bookingNumber   String?
+  specialRequests String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  booking         Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  hotel           Hotel?   @relation(fields: [hotelId], references: [id])
+
+  @@map("hotel_bookings")
+}
+
+model TransferBooking {
+  id            String    @id @default(cuid())
+  bookingId     String
+  transferId    String?
+  fromLocation  String
+  toLocation    String
+  transferDate  DateTime
+  transferTime  String
+  vehicleType   String
+  passengers    Int       @default(1)
+  price         Int
+  bookingNumber String?
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  booking       Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  transfer      Transfer? @relation(fields: [transferId], references: [id])
+
+  @@map("transfer_bookings")
+}
+
+model ExcursionBooking {
+  id            String     @id @default(cuid())
+  bookingId     String
+  excursionId   String?
+  title         String
+  description   String?
+  location      String
+  excursionDate DateTime
+  excursionTime String
+  duration      Int
+  participants  Int        @default(1)
+  price         Int
+  totalPrice    Int
+  bookingNumber String?
+  meetingPoint  String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  booking       Booking    @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  excursion     Excursion? @relation(fields: [excursionId], references: [id])
+
+  @@map("excursion_bookings")
+}
+
+model BookingAudit {
+  id            String   @id @default(cuid())
+  bookingId     String
+  userId        String
+  action        String
+  changes       Json
+  previousState Json?
+  newState      Json?
+  notes         String?
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime @default(now())
+  booking       Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user          User     @relation(fields: [userId], references: [id])
+
+  @@index([bookingId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("booking_audits")
+}
+
+model Country {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String   @unique
+  currency  String   @default("EUR")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  cities    City[]
+
+  @@map("countries")
+}
+
+model City {
+  id                 String      @id @default(cuid())
+  name               String
+  countryId          String
+  timezone           String      @default("Europe/London")
+  popular            Boolean     @default(false)
+  active             Boolean     @default(true)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  slug               String?     @unique
+  about              String?
+  profileImage       String?
+  airports           Airport[]
+  bookings           Booking[]
+  country            Country     @relation(fields: [countryId], references: [id])
+  excursions         Excursion[]
+  flightDestinations Flight[]    @relation("FlightDestination")
+  flightOrigins      Flight[]    @relation("FlightOrigin")
+  hotelsInCity       Hotel[]     @relation("HotelCity")
+  packages           Package[]
+  transfersFrom      Transfer[]  @relation("TransferFrom")
+  transfersTo        Transfer[]  @relation("TransferTo")
+
+  @@unique([name, countryId])
+  @@index([countryId])
+  @@map("cities")
+}
+
+model Airport {
+  id               String   @id @default(cuid())
+  code             String   @unique
+  name             String
+  cityId           String
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  city             City     @relation(fields: [cityId], references: [id])
+  flightArrivals   Flight[] @relation("FlightArrivalAirport")
+  flightDepartures Flight[] @relation("FlightDepartureAirport")
+
+  @@index([cityId])
+  @@map("airports")
+}
+
+model PackagePrice {
+  id            String   @id @default(cuid())
+  packageId     String
+  adults        Int
+  children      Int
+  childAges     String
+  flightPrice   Decimal  @db.Decimal(10, 2)
+  hotelPrice    Decimal  @db.Decimal(10, 2)
+  transferPrice Decimal  @db.Decimal(10, 2)
+  totalPrice    Decimal  @db.Decimal(10, 2)
+  hotelBoard    String
+  roomType      String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  hotelName     String?
+  flightBlockId String?
+  nights        Int?
+  package       Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@index([packageId, adults, children])
+  @@map("package_prices")
+}
+
+model Package {
+  id                String             @id @default(cuid())
+  name              String
+  description       String
+  cityId            String
+  departureFlightId String
+  returnFlightId    String
+  hotelId           String
+  roomId            String?
+  nights            Int
+  basePrice         Int
+  maxOccupancy      Int                @default(2)
+  availableFrom     DateTime
+  availableTo       DateTime
+  active            Boolean            @default(true)
+  featured          Boolean            @default(false)
+  includesTransfer  Boolean            @default(true)
+  transferId        String?
+  highlights        String[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  flightBlockIds    Json?
+  hotelIds          Json?
+  profitMargin      Decimal?           @db.Decimal(5, 2)
+  serviceCharge     Decimal?           @db.Decimal(10, 2)
+  slug              String?            @unique
+  primaryImage      String?
+  images            Json?              @default("[]")
+  info              String?
+  planAndProgram    String?
+  shortDescription  String?            @db.VarChar(400)
+  usefulInformation String?
+  whatIsIncluded    String?
+  packageBookings   PackageBooking[]
+  excursions        PackageExcursion[]
+  packagePrices     PackagePrice[]
+  city              City               @relation(fields: [cityId], references: [id])
+  departureFlight   Flight             @relation("PackageDeparture", fields: [departureFlightId], references: [id])
+  hotel             Hotel              @relation(fields: [hotelId], references: [id])
+  returnFlight      Flight             @relation("PackageReturn", fields: [returnFlightId], references: [id])
+  room              Room?              @relation(fields: [roomId], references: [id])
+  transfer          Transfer?          @relation(fields: [transferId], references: [id])
+
+  @@index([cityId])
+  @@index([hotelId])
+  @@map("packages")
+}
+
+model PackageExcursion {
+  id          String    @id @default(cuid())
+  packageId   String
+  excursionId String
+  included    Boolean   @default(false)
+  price       Int?
+  excursion   Excursion @relation(fields: [excursionId], references: [id])
+  package     Package   @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@unique([packageId, excursionId])
+  @@map("package_excursions")
+}
+
+model PackageBooking {
+  id                   String   @id @default(cuid())
+  bookingId            String
+  packageId            String
+  adults               Int      @default(2)
+  children             Int      @default(0)
+  infants              Int      @default(0)
+  checkIn              DateTime
+  checkOut             DateTime
+  totalPrice           Int
+  selectedExcursionIds String[]
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  booking              Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  package              Package  @relation(fields: [packageId], references: [id])
+
+  @@map("package_bookings")
+}
+
+enum UserRole {
+  USER
+  AGENT
+  ADMIN
+}
+
+enum BookingStatus {
+  SOFT
+  CONFIRMED
+  PAID
+  CANCELLED
+}

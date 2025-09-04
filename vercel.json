@@ -1,0 +1,72 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "env": {
+    "DATABASE_URL": "@database_url",
+    "NEXTAUTH_SECRET": "@nextauth_secret",
+    "NEXTAUTH_URL": "@nextauth_url",
+    "MAILGUN_API_KEY": "@mailgun_api_key",
+    "MAILGUN_DOMAIN": "@mailgun_domain",
+    "N8N_WEBHOOK_URL": "@n8n_webhook_url",
+    "SERPAPI_KEY": "@serpapi_key"
+  },
+  "build": {
+    "env": {
+      "DATABASE_URL": "@database_url",
+      "NEXTAUTH_SECRET": "@nextauth_secret"
+    }
+  },
+  "functions": {
+    "app/api/auth/[...nextauth]/route.ts": {
+      "maxDuration": 10
+    },
+    "app/api/admin/*/route.ts": {
+      "maxDuration": 10
+    },
+    "app/api/agent/*/route.ts": {
+      "maxDuration": 10
+    },
+    "app/api/bookings/*/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/flights/search/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/hotels/search/route.ts": {
+      "maxDuration": 30
+    }
+  },
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, DELETE, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization"
+        }
+      ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/admin",
+      "destination": "/admin/dashboard",
+      "permanent": false
+    },
+    {
+      "source": "/agent",
+      "destination": "/agent/dashboard",
+      "permanent": false
+    }
+  ]
+}
