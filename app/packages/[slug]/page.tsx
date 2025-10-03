@@ -1,351 +1,50 @@
 'use client';
 
-import { use, useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { use } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Star, Calendar, MapPin, Clock, Users, Plane, Hotel, ChevronRight, Check, Plus, Minus } from 'lucide-react';
+import { Star, Calendar, MapPin, Clock, Plane, Hotel, ChevronRight, Check, Plus, Minus } from 'lucide-react';
 import Header from '@/app/components/Header';
 import Footer from '@/app/components/Footer';
-import { calculateRealTimePrice, formatDisplayPrice } from '@/lib/real-time-price-calculator';
+import MobilePackageDetailsPage from '@/components/mobile/PackageDetailsPage';
+import { usePackageDetails } from '@/lib/hooks/usePackageDetails';
+import { useIsMobile } from '@/lib/hooks/useDeviceType';
 
-interface HotelOption {
-  id: string;
-  name: string;
-  slug: string;
-  rating: number;
-  address: string;
-  amenities: string[];
-  description: string;
-  primaryImage?: string;
-  hotelPrices?: Array<{
-    single: number;
-    double: number;
-    extraBed: number;
-    payingKidsAge: string;
-    paymentKids: number;
-    fromDate: string;
-    tillDate: string;
-    board: string;
-  }>;
-}
-
-interface PackageDetails {
-  id: string;
-  name: string;
-  slug: string;
-  description: string;
-  shortDescription?: string;
-  primaryImage?: string;
-  planAndProgram?: string;
-  whatIsIncluded?: string;
-  usefulInformation?: string;
-  info?: string;
-  duration: string;
-  basePrice: number;
-  featured: boolean;
-  active: boolean;
-  availableFrom: string;
-  availableTo: string;
-  hotel: HotelOption;
-  availableHotels: HotelOption[];
-  city: {
-    id: string;
-    name: string;
-    slug: string;
-    country: {
-      name: string;
-      code: string;
-    };
-  };
-  departureFlight: {
-    flightNumber: string;
-    departureTime: string;
-    arrivalTime: string;
-    departureAirport: {
-      code: string;
-      name: string;
-    };
-    arrivalAirport: {
-      code: string;
-      name: string;
-    };
-  };
-  returnFlight: {
-    flightNumber: string;
-    departureTime: string;
-    arrivalTime: string;
-    departureAirport: {
-      code: string;
-      name: string;
-    };
-    arrivalAirport: {
-      code: string;
-      name: string;
-    };
-  };
-  packagePrices: Array<{
-    adults: number;
-    children: number;
-    flightPrice: number;
-    hotelPrice: number;
-    transferPrice: number;
-    totalPrice: number;
-    hotelName?: string;
-    hotelBoard?: string;
-    roomType?: string;
-    flightBlockId?: string;
-    nights?: number;
-  }>;
-}
-
-export default function PackageDetailPage({ 
-  params 
-}: { 
-  params: Promise<{ slug: string }> 
+export default function PackageDetailPage({
+  params
+}: {
+  params: Promise<{ slug: string }>
 }) {
   const resolvedParams = use(params);
-  const router = useRouter();
-  const [packageData, setPackageData] = useState<PackageDetails | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [selectedHotel, setSelectedHotel] = useState<HotelOption | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string>('');
-  const [selectedOccupancy, setSelectedOccupancy] = useState({
-    adults: 2,
-    children: 0
-  });
-  const [childAges, setChildAges] = useState<number[]>([]);
-  const [tempChildAges, setTempChildAges] = useState<number[]>([]);
-  const [flightBlocks, setFlightBlocks] = useState<any[]>([]);
-  const [selectedFlightBlock, setSelectedFlightBlock] = useState<any>(null);
+  const isMobile = useIsMobile();
+  const {
+    packageData,
+    loading,
+    selectedHotel,
+    selectedOccupancy,
+    childAges,
+    tempChildAges,
+    flightBlocks,
+    selectedFlightBlock,
+    selectedPrice,
+    sortedHotels,
+    calculateNights,
+    handleBooking,
+    setSelectedHotel,
+    setSelectedFlightBlock,
+    updateAdults,
+    updateChildren,
+    updateChildAge,
+    applyChildAges,
+    hasUnappliedAgeChanges
+  } = usePackageDetails(resolvedParams.slug);
 
-  useEffect(() => {
-    fetchPackageDetails();
-  }, [resolvedParams.slug]);
+  // Render mobile version
+  if (isMobile) {
+    return <MobilePackageDetailsPage slug={resolvedParams.slug} />;
+  }
 
-  // Ensure childAges and tempChildAges arrays match children count
-  useEffect(() => {
-    const currentLength = childAges.length;
-    const targetLength = selectedOccupancy.children;
-    
-    if (currentLength < targetLength) {
-      // Add default ages for new children
-      const newAges = [...childAges];
-      const newTempAges = [...tempChildAges];
-      for (let i = currentLength; i < targetLength; i++) {
-        newAges.push(5); // Default age
-        newTempAges.push(5);
-      }
-      setChildAges(newAges);
-      setTempChildAges(newTempAges);
-    } else if (currentLength > targetLength) {
-      // Remove excess ages
-      setChildAges(childAges.slice(0, targetLength));
-      setTempChildAges(tempChildAges.slice(0, targetLength));
-    }
-  }, [selectedOccupancy.children]);
-
-  const fetchPackageDetails = async () => {
-    try {
-      const response = await fetch(`/api/public/packages/${resolvedParams.slug}`);
-      if (response.ok) {
-        const data = await response.json();
-        setPackageData(data);
-        
-        // Sort hotels by price and select the cheapest (first) one
-        const hotels = data.availableHotels && data.availableHotels.length > 0 
-          ? data.availableHotels 
-          : [data.hotel];
-        
-        // Sort hotels by their cheapest price (using HB price or any available price)
-        const sortedHotels = [...hotels].sort((a: any, b: any) => {
-          // Get the cheapest double room price for each hotel
-          const getPriceForHotel = (hotel: any) => {
-            if (hotel.hotelPrices && hotel.hotelPrices.length > 0) {
-              // Find the cheapest double room price
-              const prices = hotel.hotelPrices.map((hp: any) => Number(hp.double));
-              return Math.min(...prices);
-            }
-            return 999999; // High number if no price found
-          };
-          
-          const priceA = getPriceForHotel(a);
-          const priceB = getPriceForHotel(b);
-          
-          return priceA - priceB;
-        });
-        
-        // Set the cheapest hotel as selected
-        if (sortedHotels.length > 0) {
-          setSelectedHotel(sortedHotels[0]);
-        }
-        
-        // Set flight blocks - wait for them to load before setting selection
-        if (data.flightBlocks && data.flightBlocks.length > 0) {
-          setFlightBlocks(data.flightBlocks);
-          // Don't set selected flight block here - wait for useEffect
-        } else if (data.flightBlockIds && data.flightBlockIds.length > 0) {
-          fetchFlightBlocks(data.flightBlockIds);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching package details:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchFlightBlocks = async (blockIds: string[]) => {
-    try {
-      const response = await fetch(`/api/public/flight-blocks?blockIds=${blockIds.join(',')}`);
-      if (response.ok) {
-        const blocks = await response.json();
-        setFlightBlocks(blocks);
-        // Don't set selected here - let useEffect handle it
-      }
-    } catch (error) {
-      console.error('Error fetching flight blocks:', error);
-    }
-  };
-
-  // Set default selected flight block when blocks are loaded
-  useEffect(() => {
-    if (flightBlocks.length > 0 && !selectedFlightBlock) {
-      // Find the first available (not sold out) block
-      const firstAvailableBlock = flightBlocks.find(block => {
-        const isSoldOut = (block.outbound?.availableSeats <= 0) || (block.return?.availableSeats <= 0);
-        return !isSoldOut;
-      });
-
-      // If we found an available block, select it; otherwise, select the first block (even if sold out)
-      setSelectedFlightBlock(firstAvailableBlock || flightBlocks[0]);
-    }
-  }, [flightBlocks]);
-
-  // Helper function to calculate hotel nights based on check-in and check-out dates
-  // Check-in: Arrival date at destination (outbound flight arrival)
-  // Check-out: Departure date from destination (return flight departure)
-  const calculateNights = (checkInDate: string, checkOutDate: string) => {
-    const checkIn = new Date(checkInDate);
-    const checkOut = new Date(checkOutDate);
-    
-    // Set to start of day to ignore time component
-    // This ensures we count calendar dates, not hours
-    checkIn.setHours(0, 0, 0, 0);
-    checkOut.setHours(0, 0, 0, 0);
-    
-    // Calculate difference in days (number of nights stayed)
-    const nights = Math.round((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
-    return nights;
-  };
-
-  // Calculate real-time price from database data
-  const calculateAdjustedPrice = () => {
-    if (!packageData || !selectedHotel || !selectedFlightBlock) return null;
-    
-    // Calculate nights using calendar dates
-    const nights = calculateNights(
-      selectedFlightBlock.outbound?.departureTime || packageData.departureFlight.departureTime,
-      selectedFlightBlock.return?.departureTime || packageData.returnFlight.departureTime
-    );
-    
-    // Use real-time price calculation
-    const departureDateForPricing = new Date(selectedFlightBlock.outbound?.departureTime || packageData.departureFlight.departureTime);
-    const priceResult = calculateRealTimePrice({
-      adults: selectedOccupancy.adults,
-      children: selectedOccupancy.children,
-      childAges: childAges.slice(0, selectedOccupancy.children),
-      flightBlock: selectedFlightBlock,
-      hotel: selectedHotel,
-      nights: nights,
-      travelDate: departureDateForPricing
-    });
-    
-    // Count children by age for display
-    const actualChildAges = childAges.slice(0, selectedOccupancy.children);
-    const infantsCount = actualChildAges.filter(age => age <= 1).length;
-    const youngChildrenCount = actualChildAges.filter(age => age >= 2 && age <= 6).length;
-    const olderChildrenCount = actualChildAges.filter(age => age >= 7 && age <= 11).length;
-    
-    return {
-      adults: selectedOccupancy.adults,
-      children: selectedOccupancy.children,
-      flightPrice: priceResult.flightPrice,
-      hotelPrice: priceResult.hotelPrice,
-      transferPrice: priceResult.transferPrice,
-      totalPrice: priceResult.totalPrice,
-      hotelName: selectedHotel.name,
-      hotelBoard: 'BB',
-      roomType: selectedOccupancy.adults === 1 ? 'Single' : 'Double',
-      infantsCount,
-      youngChildrenCount,
-      olderChildrenCount,
-      payingChildrenCount: youngChildrenCount + olderChildrenCount
-    };
-  };
-  
-  const selectedPrice = calculateAdjustedPrice();
-
-  const handleBooking = () => {
-    if (!packageData || !selectedHotel) return;
-    
-    const bookingParams = new URLSearchParams({
-      packageId: packageData.id,
-      hotelId: selectedHotel.id,
-      adults: selectedOccupancy.adults.toString(),
-      children: selectedOccupancy.children.toString(),
-      price: selectedPrice ? selectedPrice.totalPrice.toString() : packageData.basePrice.toString()
-    });
-    
-    router.push(`/booking?${bookingParams.toString()}`);
-  };
-
-  // Generate available dates based on package availability
-  const generateAvailableDates = () => {
-    if (!packageData) return [];
-    
-    const dates = [];
-    const startDate = new Date(packageData.availableFrom);
-    const endDate = new Date(packageData.availableTo);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    // Generate departures every 3 days
-    const current = new Date(Math.max(startDate.getTime(), today.getTime()));
-    let dayCount = 0;
-    
-    while (current <= endDate && dates.length < 30) { // Limit to 30 dates
-      // Add a date every 3 days
-      if (dayCount % 3 === 0) {
-        dates.push({
-          value: current.toISOString().split('T')[0],
-          label: current.toLocaleDateString('en-GB', {
-            weekday: 'short',
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric'
-          })
-        });
-      }
-      current.setDate(current.getDate() + 1);
-      dayCount++;
-    }
-    
-    // If no dates generated, add at least today if within range
-    if (dates.length === 0 && today >= startDate && today <= endDate) {
-      dates.push({
-        value: today.toISOString().split('T')[0],
-        label: today.toLocaleDateString('en-GB', {
-          weekday: 'short',
-          day: 'numeric',
-          month: 'short',
-          year: 'numeric'
-        })
-      });
-    }
-    
-    return dates;
-  };
+  // Desktop version below
 
   if (loading) {
     return (
@@ -371,31 +70,10 @@ export default function PackageDetailPage({
     );
   }
 
-  const departureDate = new Date(packageData.departureFlight.departureTime);
-  const returnDate = new Date(packageData.returnFlight.departureTime);
-  // Calculate nights using the helper function
-  const nights = calculateNights(packageData.departureFlight.departureTime, packageData.returnFlight.departureTime);
-
-  // Get all available hotels (from availableHotels or fallback to single hotel)
-  const hotels = packageData.availableHotels && packageData.availableHotels.length > 0 
-    ? packageData.availableHotels 
-    : [packageData.hotel];
-
-  // Sort hotels by price (low to high)
-  const sortedHotels = [...hotels].sort((a, b) => {
-    // Find the cheapest price for each hotel
-    const priceA = packageData.packagePrices
-      .filter(p => p.hotelName === a.name && p.adults === selectedOccupancy.adults && p.children === 0)
-      .map(p => Number(p.totalPrice))
-      .sort((x, y) => x - y)[0] || 999999;
-    
-    const priceB = packageData.packagePrices
-      .filter(p => p.hotelName === b.name && p.adults === selectedOccupancy.adults && p.children === 0)
-      .map(p => Number(p.totalPrice))
-      .sort((x, y) => x - y)[0] || 999999;
-    
-    return priceA - priceB;
-  });
+  const nights = calculateNights(
+    selectedFlightBlock?.outbound?.departureTime || packageData.departureFlight.departureTime,
+    selectedFlightBlock?.return?.departureTime || packageData.returnFlight.departureTime
+  );
 
   return (
     <>
@@ -1148,10 +826,7 @@ export default function PackageDetailPage({
                     <label className="text-xs text-gray-600 mb-1 block">Adults</label>
                     <div className="flex items-center">
                       <button
-                        onClick={() => setSelectedOccupancy(prev => ({
-                          ...prev,
-                          adults: Math.max(1, prev.adults - 1)
-                        }))}
+                        onClick={() => updateAdults(selectedOccupancy.adults - 1)}
                         className="p-1 border rounded hover:bg-gray-100"
                         type="button"
                       >
@@ -1161,10 +836,7 @@ export default function PackageDetailPage({
                         {selectedOccupancy.adults}
                       </span>
                       <button
-                        onClick={() => setSelectedOccupancy(prev => ({
-                          ...prev,
-                          adults: Math.min(4, prev.adults + 1)
-                        }))}
+                        onClick={() => updateAdults(selectedOccupancy.adults + 1)}
                         className="p-1 border rounded hover:bg-gray-100"
                         type="button"
                       >
@@ -1172,20 +844,13 @@ export default function PackageDetailPage({
                       </button>
                     </div>
                   </div>
-                  
+
                   {/* Children */}
                   <div className="flex-1">
                     <label className="text-xs text-gray-600 mb-1 block">Children (0-11)</label>
                     <div className="flex items-center">
                       <button
-                        onClick={() => {
-                          const newCount = Math.max(0, selectedOccupancy.children - 1);
-                          setSelectedOccupancy(prev => ({
-                            ...prev,
-                            children: newCount
-                          }));
-                          setChildAges(prev => prev.slice(0, newCount));
-                        }}
+                        onClick={() => updateChildren(selectedOccupancy.children - 1)}
                         className="p-1 border rounded hover:bg-gray-100"
                         type="button"
                       >
@@ -1195,14 +860,7 @@ export default function PackageDetailPage({
                         {selectedOccupancy.children}
                       </span>
                       <button
-                        onClick={() => {
-                          const newCount = Math.min(3, selectedOccupancy.children + 1);
-                          setSelectedOccupancy(prev => ({
-                            ...prev,
-                            children: newCount
-                          }));
-                          // Child ages are now managed by useEffect
-                        }}
+                        onClick={() => updateChildren(selectedOccupancy.children + 1)}
                         className="p-1 border rounded hover:bg-gray-100"
                         type="button"
                       >
@@ -1222,11 +880,7 @@ export default function PackageDetailPage({
                           <span className="text-xs text-gray-500 min-w-[50px]">Child {index + 1}:</span>
                           <select
                             value={tempChildAges[index] !== undefined ? tempChildAges[index] : 5}
-                            onChange={(e) => {
-                              const newTempAges = [...tempChildAges];
-                              newTempAges[index] = parseInt(e.target.value);
-                              setTempChildAges(newTempAges);
-                            }}
+                            onChange={(e) => updateChildAge(index, parseInt(e.target.value))}
                             className="flex-1 px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-blue-500"
                           >
                             {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((age) => (
@@ -1238,9 +892,9 @@ export default function PackageDetailPage({
                         </div>
                       ))}
                       {/* Update button to apply age changes */}
-                      {tempChildAges.some((age, idx) => age !== childAges[idx]) && (
+                      {hasUnappliedAgeChanges() && (
                         <button
-                          onClick={() => setChildAges([...tempChildAges])}
+                          onClick={applyChildAges}
                           className="mt-2 w-full py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition-colors"
                         >
                           Update Prices

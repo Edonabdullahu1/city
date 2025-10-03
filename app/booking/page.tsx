@@ -1,7 +1,9 @@
 'use client';
 
+import MobileBookingForm from '@/components/mobile/BookingForm';
 import { useBookingForm, PassengerDetails } from '@/lib/hooks/useBookingForm';
 import { COUNTRY_CODES } from '@/lib/utils/countryCodes';
+import { useIsMobile } from '@/lib/hooks/useDeviceType';
 import { User, Phone, Mail, Calendar, ChevronLeft, ChevronRight, Users, Check, Star, MapPin } from 'lucide-react';
 
 const STEPS = [
@@ -11,6 +13,7 @@ const STEPS = [
 ];
 
 export default function BookingPage() {
+  const isMobile = useIsMobile();
   const {
     currentStep,
     loading,
@@ -37,6 +40,12 @@ export default function BookingPage() {
     router
   } = useBookingForm();
 
+  // Render mobile version
+  if (isMobile) {
+    return <MobileBookingForm />;
+  }
+
+  // Desktop version below
   const renderStepContent = () => {
     switch (currentStep) {
       case 1:

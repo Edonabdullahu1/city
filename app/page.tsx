@@ -1,89 +1,29 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import Header from './components/Header';
 import Footer from './components/Footer';
-
-interface City {
-  id: string;
-  name: string;
-  slug: string;
-  profileImage?: string;
-  country: {
-    name: string;
-  };
-}
-
-interface FlightDate {
-  date: string;
-  availableSeats: number;
-}
+import MobileHomePage from '@/components/mobile/HomePage';
+import { useHomePage } from '@/lib/hooks/useHomePage';
+import { useIsMobile } from '@/lib/hooks/useDeviceType';
 
 export default function Home() {
-  const router = useRouter();
-  const [cities, setCities] = useState<City[]>([]);
-  const [availableDates, setAvailableDates] = useState<FlightDate[]>([]);
-  const [searchData, setSearchData] = useState({
-    destinationId: '',
-    departureDate: '',
-    adults: 2,
-    children: 0
-  });
+  const isMobile = useIsMobile();
+  const {
+    cities,
+    availableDates,
+    searchData,
+    updateSearchData,
+    handleSearch
+  } = useHomePage();
 
-  useEffect(() => {
-    fetchCitiesWithPackages();
-  }, []);
+  // Render mobile version
+  if (isMobile) {
+    return <MobileHomePage />;
+  }
 
-  useEffect(() => {
-    if (searchData.destinationId) {
-      fetchAvailableDates(searchData.destinationId);
-    }
-  }, [searchData.destinationId]);
-
-  const fetchCitiesWithPackages = async () => {
-    try {
-      const response = await fetch('/api/public/destinations');
-      if (response.ok) {
-        const data = await response.json();
-        setCities(data);
-      }
-    } catch (error) {
-      console.error('Error fetching destinations:', error);
-    }
-  };
-
-  const fetchAvailableDates = async (cityId: string) => {
-    try {
-      const response = await fetch(`/api/public/available-dates?cityId=${cityId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setAvailableDates(data);
-      }
-    } catch (error) {
-      console.error('Error fetching available dates:', error);
-    }
-  };
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchData.destinationId || !searchData.departureDate) {
-      alert('Please select a destination and date');
-      return;
-    }
-    
-    // Navigate to search results page
-    const params = new URLSearchParams({
-      city: searchData.destinationId,
-      date: searchData.departureDate,
-      adults: searchData.adults.toString(),
-      children: searchData.children.toString()
-    });
-    
-    router.push(`/search?${params.toString()}`);
-  };
+  // Desktop version below
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
@@ -110,7 +50,7 @@ export default function Home() {
                 </label>
                 <select
                   value={searchData.destinationId}
-                  onChange={(e) => setSearchData({ ...searchData, destinationId: e.target.value })}
+                  onChange={(e) => updateSearchData({ destinationId: e.target.value })}
                   className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   required
                 >
@@ -130,7 +70,7 @@ export default function Home() {
                 </label>
                 <select
                   value={searchData.departureDate}
-                  onChange={(e) => setSearchData({ ...searchData, departureDate: e.target.value })}
+                  onChange={(e) => updateSearchData({ departureDate: e.target.value })}
                   className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   disabled={!searchData.destinationId}
                   required
@@ -155,7 +95,7 @@ export default function Home() {
                 </label>
                 <select
                   value={searchData.adults}
-                  onChange={(e) => setSearchData({ ...searchData, adults: parseInt(e.target.value) })}
+                  onChange={(e) => updateSearchData({ adults: parseInt(e.target.value) })}
                   className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
                   <option value={1}>1 Adult</option>
@@ -172,7 +112,7 @@ export default function Home() {
                 </label>
                 <select
                   value={searchData.children}
-                  onChange={(e) => setSearchData({ ...searchData, children: parseInt(e.target.value) })}
+                  onChange={(e) => updateSearchData({ children: parseInt(e.target.value) })}
                   className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
                   <option value={0}>No Children</option>
