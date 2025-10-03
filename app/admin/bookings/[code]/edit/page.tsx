@@ -168,7 +168,7 @@ export default function AdminEditBookingPage() {
   
   // State for passenger data
   const [passengerData, setPassengerData] = useState<{
-    adults: Array<{firstName: string, lastName: string, dateOfBirth: string, passportNumber: string, email: string}>;
+    adults: Array<{title: string, firstName: string, lastName: string, dateOfBirth: string, passportNumber: string, email: string}>;
     children: Array<{firstName: string, lastName: string, dateOfBirth: string, passportNumber: string}>;
     infants: Array<{firstName: string, lastName: string, dateOfBirth: string}>;
   }>({
@@ -233,6 +233,7 @@ export default function AdminEditBookingPage() {
 
           setPassengerData({
             adults: Array.from({length: adultsCount}, (_, i) => ({
+              title: 'Mr',
               firstName: i === 0 ? firstName : '',
               lastName: i === 0 ? lastName : '',
               dateOfBirth: '',
@@ -735,56 +736,76 @@ export default function AdminEditBookingPage() {
                                 Edit Details
                               </button>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                  First Name
-                                </label>
-                                <input
-                                  type="text"
-                                  value={adult.firstName}
-                                  onChange={(e) => handlePassengerChange('adults', index, 'firstName', e.target.value)}
-                                  placeholder="Enter first name"
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                />
+                            <div className="space-y-4">
+                              <div className="grid grid-cols-3 gap-4">
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Title
+                                  </label>
+                                  <select
+                                    value={adult.title}
+                                    onChange={(e) => handlePassengerChange('adults', index, 'title', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                  >
+                                    <option value="Mr">Mr</option>
+                                    <option value="Mrs">Mrs</option>
+                                    <option value="Ms">Ms</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    First Name
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={adult.firstName}
+                                    onChange={(e) => handlePassengerChange('adults', index, 'firstName', e.target.value.toUpperCase())}
+                                    placeholder="Enter first name"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                    style={{ textTransform: 'uppercase' }}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Last Name
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={adult.lastName}
+                                    onChange={(e) => handlePassengerChange('adults', index, 'lastName', e.target.value.toUpperCase())}
+                                    placeholder="Enter last name"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                    style={{ textTransform: 'uppercase' }}
+                                  />
+                                </div>
                               </div>
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                  Last Name
-                                </label>
-                                <input
-                                  type="text"
-                                  value={adult.lastName}
-                                  onChange={(e) => handlePassengerChange('adults', index, 'lastName', e.target.value)}
-                                  placeholder="Enter last name"
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                  Date of Birth
-                                </label>
-                                <input
-                                  type="date"
-                                  value={adult.dateOfBirth}
-                                  onChange={(e) => handlePassengerChange('adults', index, 'dateOfBirth', e.target.value)}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                  Passport Number
-                                </label>
-                                <input
-                                  type="text"
-                                  value={adult.passportNumber}
-                                  onChange={(e) => handlePassengerChange('adults', index, 'passportNumber', e.target.value)}
-                                  placeholder="Enter passport number"
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                />
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Date of Birth
+                                  </label>
+                                  <input
+                                    type="date"
+                                    value={adult.dateOfBirth}
+                                    onChange={(e) => handlePassengerChange('adults', index, 'dateOfBirth', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Passport Number
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={adult.passportNumber}
+                                    onChange={(e) => handlePassengerChange('adults', index, 'passportNumber', e.target.value)}
+                                    placeholder="Enter passport number"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                  />
+                                </div>
                               </div>
                               {index === 0 && (
-                                <div className="col-span-2">
+                                <div>
                                   <label className="block text-sm font-medium text-gray-700 mb-1">
                                     Email Address
                                   </label>

@@ -61,7 +61,6 @@ export async function GET(
 
     // Get hotel info (prioritize selectedHotel, fallback to package hotel)
     const hotelInfo = booking.packages?.[0]?.selectedHotel || booking.packages?.[0]?.package?.hotel;
-    const customerName = booking.customerName || `${booking.user?.firstName || ''} ${booking.user?.lastName || ''}`.trim();
 
     // Get passenger information
     const packageInfo = booking.packages?.[0];
@@ -74,21 +73,37 @@ export async function GET(
                         (booking.checkInDate ? new Date(booking.checkInDate) : null);
     const checkOutDate = packageInfo?.checkOut ? new Date(packageInfo.checkOut) :
                          (booking.checkOutDate ? new Date(booking.checkOutDate) : null);
-    const nightsStay = checkInDate && checkOutDate ?
-      Math.floor((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+
+    // Fix: Calculate nights correctly by using UTC dates to avoid timezone issues
+    let nightsStay = 0;
+    if (checkInDate && checkOutDate) {
+      const checkInUTC = Date.UTC(checkInDate.getFullYear(), checkInDate.getMonth(), checkInDate.getDate());
+      const checkOutUTC = Date.UTC(checkOutDate.getFullYear(), checkOutDate.getMonth(), checkOutDate.getDate());
+      nightsStay = Math.floor((checkOutUTC - checkInUTC) / (1000 * 60 * 60 * 24));
+    }
 
     // Extract passenger names from passengerDetails
     let passengerList: string[] = [];
+    let primaryGuestName = '';
     if (booking.passengerDetails && typeof booking.passengerDetails === 'object') {
       const details = booking.passengerDetails as any;
+
+      // Debug: Log the passenger details to see what's in the database
+      console.log('Passenger Details from DB:', JSON.stringify(details, null, 2));
 
       // Add adults
       if (details.adults && Array.isArray(details.adults)) {
         passengerList = passengerList.concat(
-          details.adults.map((adult: any) =>
-            `${adult.title || ''} ${adult.firstName || ''} ${adult.lastName || ''}`.trim()
-          )
+          details.adults.map((adult: any, index: number) => {
+            console.log(`Adult ${index + 1}:`, adult);
+            return `${adult.title || ''} ${adult.firstName || ''} ${adult.lastName || ''}`.trim();
+          })
         );
+        // Use first adult as primary guest
+        if (details.adults.length > 0) {
+          const firstAdult = details.adults[0];
+          primaryGuestName = `${firstAdult.title || ''} ${firstAdult.firstName || ''} ${firstAdult.lastName || ''}`.trim();
+        }
       }
 
       // Add children
@@ -108,6 +123,11 @@ export async function GET(
           )
         );
       }
+    }
+
+    // Fallback to customerName if no passenger details available
+    if (!primaryGuestName) {
+      primaryGuestName = booking.customerName || `${booking.user?.firstName || ''} ${booking.user?.lastName || ''}`.trim();
     }
 
     const html = `
@@ -336,7 +356,7 @@ export async function GET(
                 <div style="font-weight: bold; color: #1e3c72; margin-bottom: 10px; font-size: 12pt;">GUEST INFORMATION</div>
                 <div class="info-row">
                     <span class="label">Primary Guest</span>
-                    <span class="value">${customerName}</span>
+                    <span class="value">${primaryGuestName}</span>
                 </div>
                 <div class="info-row">
                     <span class="label">Email</span>

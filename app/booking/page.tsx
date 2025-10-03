@@ -197,7 +197,6 @@ interface PassengerDetails {
   firstName: string;
   lastName: string;
   dateOfBirth: string;
-  gender: string;
   type: 'ADULT' | 'CHILD' | 'INFANT';
 }
 
@@ -275,11 +274,10 @@ export default function BookingPage() {
         firstName: '',
         lastName: '',
         dateOfBirth: '',
-        gender: 'M',
         type: 'ADULT'
       });
     }
-    
+
     // Add children
     for (let i = 0; i < bookingData.children; i++) {
       newPassengers.push({
@@ -287,7 +285,6 @@ export default function BookingPage() {
         firstName: '',
         lastName: '',
         dateOfBirth: '',
-        gender: 'M',
         type: 'CHILD'
       });
     }
@@ -462,12 +459,11 @@ export default function BookingPage() {
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
-        return passengers.every(p => 
-          p.firstName.trim().length > 0 && 
-          p.lastName.trim().length > 0 && 
-          p.dateOfBirth.length > 0 && 
-          p.title.length > 0 && 
-          p.gender.length > 0
+        return passengers.every(p =>
+          p.firstName.trim().length > 0 &&
+          p.lastName.trim().length > 0 &&
+          p.dateOfBirth.length > 0 &&
+          p.title.length > 0
         );
       case 2:
         const phoneValid = contactDetails.phone.trim().length >= 6;
@@ -536,9 +532,10 @@ export default function BookingPage() {
                       <input
                         type="text"
                         value={passenger.firstName}
-                        onChange={(e) => handlePassengerChange(index, 'firstName', e.target.value)}
+                        onChange={(e) => handlePassengerChange(index, 'firstName', e.target.value.toUpperCase())}
                         className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                         placeholder="Enter first name"
+                        style={{ textTransform: 'uppercase' }}
                       />
                     </div>
 
@@ -550,14 +547,15 @@ export default function BookingPage() {
                       <input
                         type="text"
                         value={passenger.lastName}
-                        onChange={(e) => handlePassengerChange(index, 'lastName', e.target.value)}
+                        onChange={(e) => handlePassengerChange(index, 'lastName', e.target.value.toUpperCase())}
                         className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                         placeholder="Enter last name"
+                        style={{ textTransform: 'uppercase' }}
                       />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div className="mt-4">
                     {/* Date of Birth */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -581,21 +579,6 @@ export default function BookingPage() {
                           Age: {calculateAge(passenger.dateOfBirth)} years
                         </p>
                       )}
-                    </div>
-
-                    {/* Gender */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Gender *
-                      </label>
-                      <select
-                        value={passenger.gender}
-                        onChange={(e) => handlePassengerChange(index, 'gender', e.target.value)}
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="M">Male</option>
-                        <option value="F">Female</option>
-                      </select>
                     </div>
                   </div>
                 </div>
