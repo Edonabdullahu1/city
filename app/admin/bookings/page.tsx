@@ -32,14 +32,18 @@ interface Booking {
   customerName: string;
   customerEmail: string;
   customerPhone: string;
-  checkIn: string;
-  checkOut: string;
+  checkInDate: string;
+  checkOutDate: string;
   adults: number;
   children: number;
+  infants: number;
   totalAmount: number;
   currency: string;
   createdAt: string;
   user?: { name: string; email: string };
+  hotels?: any[];
+  flights?: any[];
+  packages?: any[];
 }
 
 export default function AdminBookingsPage() {
@@ -75,16 +79,23 @@ export default function AdminBookingsPage() {
       const response = await fetch('/api/admin/bookings');
       if (response.ok) {
         const data = await response.json();
-        setBookings(data);
+        // The API returns { bookings: [], pagination: {}, statistics: {} }
+        setBookings(data.bookings || []);
       }
     } catch (error) {
       console.error('Error fetching bookings:', error);
+      setBookings([]); // Ensure bookings is always an array
     } finally {
       setLoading(false);
     }
   };
 
   const filterBookings = () => {
+    // Ensure bookings is an array before filtering
+    if (!Array.isArray(bookings)) {
+      console.error('Bookings is not an array:', bookings);
+      return;
+    }
     let filtered = [...bookings];
 
     // Search filter
@@ -127,19 +138,31 @@ export default function AdminBookingsPage() {
     setCurrentPage(1);
   };
 
-  const handleDeleteBooking = async (reservationCode: string) => {
-    if (!confirm('Are you sure you want to delete this booking?')) return;
-    
+  const handleDeleteBooking = async (bookingId: string) => {
+    if (!confirm('Are you sure you want to cancel this booking?')) return;
+
     try {
-      const response = await fetch(`/api/admin/bookings/${reservationCode}`, {
+      const response = await fetch(`/api/admin/bookings?id=${bookingId}`, {
         method: 'DELETE'
       });
-      
+
       if (response.ok) {
-        setBookings(bookings.filter(b => b.reservationCode !== reservationCode));
+        alert('Booking cancelled successfully!');
+        // Update the booking status in local state
+        setBookings(prevBookings =>
+          prevBookings.map(booking =>
+            booking.id === bookingId
+              ? { ...booking, status: 'CANCELLED' }
+              : booking
+          )
+        );
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to cancel booking: ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error deleting booking:', error);
+      alert('Error cancelling booking. Please try again.');
     }
   };
 
@@ -317,7 +340,7 @@ export default function AdminBookingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Total Bookings</p>
-                <p className="text-2xl font-bold">{bookings.length}</p>
+                <p className="text-2xl font-bold">{Array.isArray(bookings) ? bookings.length : 0}</p>
               </div>
               <Calendar className="h-10 w-10 text-blue-500 opacity-50" />
             </div>
@@ -327,7 +350,7 @@ export default function AdminBookingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Pending</p>
-                <p className="text-2xl font-bold">{bookings.filter(b => b.status === 'SOFT').length}</p>
+                <p className="text-2xl font-bold">{Array.isArray(bookings) ? bookings.filter(b => b.status === 'SOFT').length : 0}</p>
               </div>
               <Clock className="h-10 w-10 text-yellow-500 opacity-50" />
             </div>
@@ -337,7 +360,7 @@ export default function AdminBookingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Confirmed</p>
-                <p className="text-2xl font-bold">{bookings.filter(b => b.status === 'CONFIRMED').length}</p>
+                <p className="text-2xl font-bold">{Array.isArray(bookings) ? bookings.filter(b => b.status === 'CONFIRMED').length : 0}</p>
               </div>
               <CheckCircle className="h-10 w-10 text-green-500 opacity-50" />
             </div>
@@ -348,7 +371,7 @@ export default function AdminBookingsPage() {
               <div>
                 <p className="text-sm text-gray-600">Total Revenue</p>
                 <p className="text-2xl font-bold">
-                  €{(bookings.reduce((sum, b) => sum + (b.status !== 'CANCELLED' ? b.totalAmount : 0), 0) / 100).toFixed(0)}
+                  €{Array.isArray(bookings) ? (bookings.reduce((sum, b) => sum + (b.status !== 'CANCELLED' ? b.totalAmount : 0), 0) / 100).toFixed(0) : '0'}
                 </p>
               </div>
               <DollarSign className="h-10 w-10 text-purple-500 opacity-50" />
@@ -364,6 +387,7 @@ export default function AdminBookingsPage() {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Package/Hotel</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dates</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Travelers</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
@@ -374,7 +398,7 @@ export default function AdminBookingsPage() {
               <tbody className="divide-y divide-gray-200">
                 {currentBookings.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
+                    <td colSpan={8} className="px-6 py-4 text-center text-gray-500">
                       No bookings found
                     </td>
                   </tr>
@@ -394,14 +418,63 @@ export default function AdminBookingsPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm">
-                          <p>{new Date(booking.checkIn).toLocaleDateString()}</p>
-                          <p className="text-gray-600">to {new Date(booking.checkOut).toLocaleDateString()}</p>
+                          {booking.packages && booking.packages.length > 0 ? (
+                            <div>
+                              <p className="font-medium">Package</p>
+                              <p className="text-gray-600">{booking.packages[0].package?.name || 'Package'}</p>
+                              {(() => {
+                                const selectedHotel = booking.packages[0].selectedHotel;
+                                const defaultHotel = booking.packages[0].package?.hotel;
+                                const hotel = selectedHotel || defaultHotel;
+
+                                return hotel ? (
+                                  <>
+                                    <p className="text-gray-600">{hotel.name}</p>
+                                    {hotel.city && (
+                                      <p className="text-xs text-gray-500">
+                                        {hotel.city.name}, {hotel.city.country?.name}
+                                      </p>
+                                    )}
+                                  </>
+                                ) : null;
+                              })()}
+                            </div>
+                          ) : booking.hotels && booking.hotels.length > 0 ? (
+                            <div>
+                              <p className="font-medium">Hotel</p>
+                              <p className="text-gray-600">{booking.hotels[0].hotelName}</p>
+                            </div>
+                          ) : (
+                            <p className="text-gray-500">N/A</p>
+                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm">
-                          <p>{booking.adults} Adults</p>
-                          {booking.children > 0 && <p className="text-gray-600">{booking.children} Children</p>}
+                          {booking.packages && booking.packages.length > 0 ? (
+                            <>
+                              <p>{booking.packages[0].checkIn ? new Date(booking.packages[0].checkIn).toLocaleDateString() : (booking.checkInDate ? new Date(booking.checkInDate).toLocaleDateString() : 'N/A')}</p>
+                              <p className="text-gray-600">to {booking.packages[0].checkOut ? new Date(booking.packages[0].checkOut).toLocaleDateString() : (booking.checkOutDate ? new Date(booking.checkOutDate).toLocaleDateString() : 'N/A')}</p>
+                            </>
+                          ) : (
+                            <>
+                              <p>{booking.checkInDate ? new Date(booking.checkInDate).toLocaleDateString() : 'N/A'}</p>
+                              <p className="text-gray-600">to {booking.checkOutDate ? new Date(booking.checkOutDate).toLocaleDateString() : 'N/A'}</p>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm">
+                          {booking.packages && booking.packages.length > 0 ? (
+                            <>
+                              <p>{booking.packages[0].adults || 0} Adults</p>
+                              {(booking.packages[0].children || 0) > 0 && <p className="text-gray-600">{booking.packages[0].children} Children</p>}
+                              {(booking.packages[0].infants || 0) > 0 && <p className="text-gray-600">{booking.packages[0].infants} Infants</p>}
+                            </>
+                          ) : (
+                            <p>0 Adults</p>
+                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -427,9 +500,9 @@ export default function AdminBookingsPage() {
                             <Edit className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => handleDeleteBooking(booking.reservationCode)}
+                            onClick={() => handleDeleteBooking(booking.id)}
                             className="text-red-600 hover:bg-red-50 p-1 rounded"
-                            title="Delete"
+                            title="Cancel"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>

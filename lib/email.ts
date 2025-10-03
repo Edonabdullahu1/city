@@ -1,15 +1,52 @@
 import nodemailer from 'nodemailer';
 
-// Create transporter with Mailgun SMTP
-const transporter = nodemailer.createTransport({
-  host: 'smtp.mailgun.org',
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.MAILGUN_SMTP_USER || '',
-    pass: process.env.MAILGUN_SMTP_PASSWORD || ''
+// Email configuration with production readiness checks
+const emailConfig = {
+  enabled: process.env.NODE_ENV === 'production' || process.env.ENABLE_EMAIL === 'true',
+  from: process.env.EMAIL_FROM || '"MXi Travel Agency" <bookings@mxitravel.com>',
+  host: process.env.MAILGUN_HOST || 'smtp.mailgun.org',
+  port: parseInt(process.env.MAILGUN_PORT || '587'),
+  secure: process.env.MAILGUN_SECURE === 'true',
+  user: process.env.MAILGUN_SMTP_USER || '',
+  pass: process.env.MAILGUN_SMTP_PASSWORD || '',
+};
+
+// Create transporter with Mailgun SMTP (only if properly configured)
+let transporter: nodemailer.Transporter | null = null;
+
+if (emailConfig.enabled && emailConfig.user && emailConfig.pass) {
+  try {
+    transporter = nodemailer.createTransport({
+      host: emailConfig.host,
+      port: emailConfig.port,
+      secure: emailConfig.secure,
+      auth: {
+        user: emailConfig.user,
+        pass: emailConfig.pass
+      },
+      // Add connection timeout and retry options
+      connectionTimeout: 10000,
+      greetingTimeout: 5000,
+      socketTimeout: 15000,
+    });
+
+    // Verify connection configuration (async, won't block startup)
+    transporter.verify((error) => {
+      if (error) {
+        console.error('❌ Email configuration error:', error.message);
+        transporter = null;
+      } else {
+        console.log('✅ Email server connection verified successfully');
+      }
+    });
+  } catch (error) {
+    console.error('❌ Failed to initialize email transporter:', error);
+    transporter = null;
   }
-});
+} else {
+  console.warn('⚠️  Email service disabled - missing configuration or not in production mode');
+  console.warn('   Set NODE_ENV=production or ENABLE_EMAIL=true to enable emails');
+}
 
 interface EmailTemplate {
   to: string;

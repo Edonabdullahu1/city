@@ -211,7 +211,14 @@ export default function PackageDetailPage({
   // Set default selected flight block when blocks are loaded
   useEffect(() => {
     if (flightBlocks.length > 0 && !selectedFlightBlock) {
-      setSelectedFlightBlock(flightBlocks[0]);
+      // Find the first available (not sold out) block
+      const firstAvailableBlock = flightBlocks.find(block => {
+        const isSoldOut = (block.outbound?.availableSeats <= 0) || (block.return?.availableSeats <= 0);
+        return !isSoldOut;
+      });
+
+      // If we found an available block, select it; otherwise, select the first block (even if sold out)
+      setSelectedFlightBlock(firstAvailableBlock || flightBlocks[0]);
     }
   }, [flightBlocks]);
 
@@ -465,11 +472,14 @@ export default function PackageDetailPage({
               <div className="space-y-2">
                 {flightBlocks.length > 0 ? flightBlocks.map((block, index) => {
                   if (!block.outbound || !block.return) return null;
-                  
+
                   const blockDepartureDate = new Date(block.outbound.departureTime);
                   const blockReturnDate = new Date(block.return.departureTime);
                   const blockNights = calculateNights(block.outbound.departureTime, block.return.departureTime);
                   const isSelected = selectedFlightBlock?.blockGroupId === block.blockGroupId;
+
+                  // Check if block is sold out (either outbound or return has no seats)
+                  const isSoldOut = (block.outbound.availableSeats <= 0) || (block.return.availableSeats <= 0);
                   
                   // Calculate adjusted price for this specific block based on child ages
                   let blockPrice = null;
@@ -535,13 +545,24 @@ export default function PackageDetailPage({
                   }
                   
                   return (
-                    <div 
-                      key={block.blockGroupId} 
-                      onClick={() => setSelectedFlightBlock(block)}
-                      className={`border rounded-lg overflow-hidden cursor-pointer transition-all ${
-                        isSelected ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-blue-400'
+                    <div
+                      key={block.blockGroupId}
+                      onClick={() => !isSoldOut && setSelectedFlightBlock(block)}
+                      className={`border rounded-lg overflow-hidden transition-all relative ${
+                        isSoldOut
+                          ? 'border-gray-200 bg-gray-100 opacity-60 cursor-not-allowed'
+                          : isSelected
+                            ? 'border-blue-600 bg-blue-50 cursor-pointer'
+                            : 'border-gray-200 hover:border-blue-400 cursor-pointer'
                       }`}
                     >
+                      {/* Sold Out Badge */}
+                      {isSoldOut && (
+                        <div className="absolute top-4 left-4 bg-red-600 text-white px-3 py-1 rounded-full text-sm font-semibold z-10">
+                          SOLD OUT
+                        </div>
+                      )}
+
                       <div className="flex relative">
                         {/* Left side - Dates (70%) */}
                         <div className="w-[70%] p-4">
@@ -586,21 +607,36 @@ export default function PackageDetailPage({
                         </div>
                         
                         {/* Right side - Price and Nights (30%) */}
-                        <div className={`w-[30%] p-4 border-l relative ${isSelected ? 'bg-blue-50' : 'bg-gray-50'}`}>
+                        <div className={`w-[30%] p-4 border-l relative ${
+                          isSoldOut ? 'bg-gray-200' : isSelected ? 'bg-blue-50' : 'bg-gray-50'
+                        }`}>
                           <div className="flex flex-col justify-center h-full text-center">
-                            <p className="text-2xl font-bold text-blue-600">
-                              €{blockPrice ? Number(blockPrice.flightPrice).toFixed(2) : '---'}
-                            </p>
-                            <p className="text-xs text-gray-500 mt-1">
-                              for {selectedOccupancy.adults + selectedOccupancy.children} {(selectedOccupancy.adults + selectedOccupancy.children) === 1 ? 'person' : 'people'}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              for {blockNights} {blockNights === 1 ? 'night' : 'nights'}
-                            </p>
+                            {isSoldOut ? (
+                              <>
+                                <p className="text-xl font-bold text-red-600">
+                                  SOLD OUT
+                                </p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  No seats available
+                                </p>
+                              </>
+                            ) : (
+                              <>
+                                <p className="text-2xl font-bold text-blue-600">
+                                  €{blockPrice ? Number(blockPrice.flightPrice).toFixed(2) : '---'}
+                                </p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  for {selectedOccupancy.adults + selectedOccupancy.children} {(selectedOccupancy.adults + selectedOccupancy.children) === 1 ? 'person' : 'people'}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  for {blockNights} {blockNights === 1 ? 'night' : 'nights'}
+                                </p>
+                              </>
+                            )}
                           </div>
-                          
+
                           {/* Selection indicator */}
-                          {isSelected && (
+                          {isSelected && !isSoldOut && (
                             <div className="absolute top-1/2 right-4 -translate-y-1/2 bg-blue-600 text-white rounded-full p-2">
                               <Check className="w-5 h-5" />
                             </div>

@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { PlusIcon, PencilIcon, TrashIcon, PaperAirplaneIcon } from '@heroicons/react/24/outline';
 import AdminLayout from '@/components/AdminLayout';
 
+type TabType = 'blocks' | 'allotment' | 'pnl';
+
 interface Flight {
   id: string;
   flightNumber: string;
@@ -58,7 +60,8 @@ interface FlightBlock {
 export default function AdminFlightsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  
+
+  const [activeTab, setActiveTab] = useState<TabType>('blocks');
   const [flights, setFlights] = useState<Flight[]>([]);
   const [flightBlocks, setFlightBlocks] = useState<FlightBlock[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,6 +70,20 @@ export default function AdminFlightsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Allotment Monitor states
+  const [allotmentFromDate, setAllotmentFromDate] = useState('');
+  const [allotmentToDate, setAllotmentToDate] = useState('');
+  const [allotmentDestination, setAllotmentDestination] = useState('all');
+  const [allotmentData, setAllotmentData] = useState<any[]>([]);
+  const [allotmentLoading, setAllotmentLoading] = useState(false);
+
+  // PNL Report states
+  const [pnlDate, setPnlDate] = useState('');
+  const [pnlFlightId, setPnlFlightId] = useState('');
+  const [availableFlightsForDate, setAvailableFlightsForDate] = useState<any[]>([]);
+  const [pnlData, setPnlData] = useState<any[]>([]);
+  const [pnlLoading, setPnlLoading] = useState(false);
   
   const [formData, setFormData] = useState({
     flightId: '',
@@ -334,6 +351,142 @@ export default function AdminFlightsPage() {
     return matchesSearch;
   });
 
+  const fetchAllotmentData = async () => {
+    if (!allotmentFromDate || !allotmentToDate) {
+      alert('Please select both from and to dates');
+      return;
+    }
+
+    setAllotmentLoading(true);
+    try {
+      const params = new URLSearchParams({
+        fromDate: allotmentFromDate,
+        toDate: allotmentToDate,
+        destination: allotmentDestination
+      });
+
+      const response = await fetch(`/api/admin/flights/allotment?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch allotment data');
+
+      const data = await response.json();
+      setAllotmentData(data.allotmentData || []);
+    } catch (error) {
+      console.error('Error fetching allotment data:', error);
+      alert('Failed to fetch allotment data');
+    } finally {
+      setAllotmentLoading(false);
+    }
+  };
+
+  const generateCalendarDays = () => {
+    if (!allotmentFromDate || !allotmentToDate) return [];
+
+    const days = [];
+    const currentDate = new Date(allotmentFromDate);
+    const endDate = new Date(allotmentToDate);
+
+    while (currentDate <= endDate) {
+      days.push({
+        date: new Date(currentDate),
+        day: currentDate.getDate(),
+        month: currentDate.getMonth() + 1
+      });
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    return days;
+  };
+
+  const calendarDays = generateCalendarDays();
+
+  const fetchFlightsByDate = async (date: string) => {
+    if (!date) return;
+
+    try {
+      const response = await fetch(`/api/admin/flights/by-date?date=${date}`);
+      if (!response.ok) throw new Error('Failed to fetch flights');
+
+      const data = await response.json();
+      setAvailableFlightsForDate(data.flights || []);
+      setPnlFlightId(''); // Reset flight selection
+      setPnlData([]); // Clear PNL data
+    } catch (error) {
+      console.error('Error fetching flights by date:', error);
+      setAvailableFlightsForDate([]);
+    }
+  };
+
+  const fetchPNLData = async () => {
+    if (!pnlFlightId) {
+      alert('Please select a flight');
+      return;
+    }
+
+    setPnlLoading(true);
+    try {
+      const response = await fetch(`/api/admin/flights/pnl?flightId=${pnlFlightId}`);
+      if (!response.ok) throw new Error('Failed to fetch PNL data');
+
+      const data = await response.json();
+      setPnlData(data.passengers || []);
+    } catch (error) {
+      console.error('Error fetching PNL data:', error);
+      alert('Failed to fetch PNL data');
+    } finally {
+      setPnlLoading(false);
+    }
+  };
+
+  const exportToExcel = () => {
+    if (pnlData.length === 0) {
+      alert('No data to export');
+      return;
+    }
+
+    // Create CSV content
+    const headers = ['Nr', 'Title', 'First Name', 'Last Name', 'Date of Birth', 'Booking Number', 'Hotel'];
+    const csvContent = [
+      headers.join(','),
+      ...pnlData.map((passenger: any, index: number) =>
+        [
+          index + 1,
+          passenger.title,
+          passenger.firstName,
+          passenger.lastName,
+          passenger.dateOfBirth || 'N/A',
+          passenger.bookingNumber,
+          passenger.hotel || 'N/A'
+        ].join(',')
+      )
+    ].join('\n');
+
+    // Download CSV
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `PNL_${pnlFlightId}_${pnlDate}.csv`;
+    link.click();
+  };
+
+  const exportToTXT = () => {
+    if (pnlData.length === 0) {
+      alert('No data to export');
+      return;
+    }
+
+    // Create TXT content
+    const txtContent = pnlData.map((passenger: any, index: number) =>
+      `${index + 1}. ${passenger.title} ${passenger.firstName} ${passenger.lastName} - DOB: ${passenger.dateOfBirth || 'N/A'} - Booking: ${passenger.bookingNumber} - Hotel: ${passenger.hotel || 'N/A'}`
+    ).join('\n');
+
+    // Download TXT
+    const blob = new Blob([txtContent], { type: 'text/plain;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `PNL_${pnlFlightId}_${pnlDate}.txt`;
+    link.click();
+  };
+
   if (status === 'loading' || loading) {
     return (
       <AdminLayout>
@@ -352,20 +505,61 @@ export default function AdminFlightsPage() {
               <h1 className="text-3xl font-bold text-gray-900">Flight Management</h1>
               <p className="text-gray-600 mt-2">Manage guaranteed block seats and flight inventory</p>
             </div>
-            <button
-              onClick={() => {
-                resetForm();
-                setShowModal(true);
-              }}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
-            >
-              <PlusIcon className="h-5 w-5 mr-2" />
-              Create Flight Block
-            </button>
+            {activeTab === 'blocks' && (
+              <button
+                onClick={() => {
+                  resetForm();
+                  setShowModal(true);
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
+              >
+                <PlusIcon className="h-5 w-5 mr-2" />
+                Create Flight Block
+              </button>
+            )}
           </div>
 
-          {/* Filters */}
-          <div className="bg-white p-4 rounded-lg shadow mb-6 flex gap-4">
+          {/* Tab Navigation */}
+          <div className="mb-6 border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+              <button
+                onClick={() => setActiveTab('blocks')}
+                className={`${
+                  activeTab === 'blocks'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
+              >
+                Flight Blocks
+              </button>
+              <button
+                onClick={() => setActiveTab('allotment')}
+                className={`${
+                  activeTab === 'allotment'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
+              >
+                Allotment Monitor
+              </button>
+              <button
+                onClick={() => setActiveTab('pnl')}
+                className={`${
+                  activeTab === 'pnl'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
+              >
+                PNL Report
+              </button>
+            </nav>
+          </div>
+
+          {/* Flight Blocks Tab Content */}
+          {activeTab === 'blocks' && (
+            <>
+              {/* Filters */}
+              <div className="bg-white p-4 rounded-lg shadow mb-6 flex gap-4">
             <input
               type="text"
               placeholder="Search flights..."
@@ -533,7 +727,6 @@ export default function AdminFlightsPage() {
               )}
             </div>
           </div>
-        </div>
 
       {/* Modal */}
       {showModal && (
@@ -856,6 +1049,318 @@ export default function AdminFlightsPage() {
           </div>
         </div>
       )}
+      </>
+          )}
+
+          {/* Allotment Monitor Tab Content */}
+          {activeTab === 'allotment' && (
+            <div className="space-y-6">
+              {/* Filters */}
+              <div className="bg-white p-6 rounded-lg shadow">
+                <h2 className="text-xl font-semibold mb-4">Flight Allotment Monitor</h2>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      From Date
+                    </label>
+                    <input
+                      type="date"
+                      value={allotmentFromDate}
+                      onChange={(e) => setAllotmentFromDate(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      To Date
+                    </label>
+                    <input
+                      type="date"
+                      value={allotmentToDate}
+                      onChange={(e) => setAllotmentToDate(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Destination
+                    </label>
+                    <select
+                      value={allotmentDestination}
+                      onChange={(e) => setAllotmentDestination(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="all">All Destinations</option>
+                      {Array.from(new Set(flightBlocks.map(b => b.outboundFlight.destinationCity))).map(city => (
+                        <option key={city} value={city}>{city}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-end">
+                    <button
+                      onClick={fetchAllotmentData}
+                      disabled={allotmentLoading}
+                      className={`w-full px-4 py-2 rounded-lg text-white ${
+                        allotmentLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+                      }`}
+                    >
+                      {allotmentLoading ? 'Loading...' : 'Filter'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Allotment Grid */}
+              {allotmentData.length > 0 && (
+                <div className="bg-white p-6 rounded-lg shadow overflow-x-auto">
+                  <table className="min-w-full border-collapse">
+                    <thead>
+                      <tr>
+                        <th className="border border-gray-300 px-4 py-2 bg-gray-50 text-left text-sm font-semibold">
+                          Flight
+                        </th>
+                        {calendarDays.map((day, index) => (
+                          <th key={index} className="border border-gray-300 px-2 py-2 bg-gray-50 text-center text-xs">
+                            <div>{day.day}</div>
+                            <div className="text-gray-500">{day.month}</div>
+                          </th>
+                        ))}
+                        <th className="border border-gray-300 px-4 py-2 bg-gray-50 text-center text-sm font-semibold">
+                          Total
+                        </th>
+                        <th className="border border-gray-300 px-4 py-2 bg-gray-50 text-center text-sm font-semibold">
+                          %
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allotmentData.map((flight, flightIndex) => (
+                        <>
+                          <tr key={`${flightIndex}-allot`} className="bg-white">
+                            <td className="border border-gray-300 px-4 py-2 text-sm font-medium" rowSpan={3}>
+                              {flight.flightNumber} ({flight.route})
+                            </td>
+                            <td colSpan={calendarDays.length + 2} className="border border-gray-300 px-2 py-1 text-xs text-gray-600 bg-blue-50">
+                              Allotment
+                            </td>
+                          </tr>
+                          <tr key={`${flightIndex}-allot-data`}>
+                            {flight.dailyData.map((data: any, dayIndex: number) => (
+                              <td key={dayIndex} className="border border-gray-300 px-2 py-2 text-center text-sm">
+                                {data.allotment}
+                              </td>
+                            ))}
+                            <td className="border border-gray-300 px-4 py-2 text-center text-sm font-semibold">
+                              {flight.totalAllotment}
+                            </td>
+                            <td className="border border-gray-300 px-4 py-2 text-center text-sm" rowSpan={3}>
+                              {flight.percentage}%
+                            </td>
+                          </tr>
+                          <tr key={`${flightIndex}-used`} className="bg-gray-50">
+                            <td colSpan={calendarDays.length + 2} className="border border-gray-300 px-2 py-1 text-xs text-gray-600">
+                              Used
+                            </td>
+                          </tr>
+                          <tr key={`${flightIndex}-used-data`}>
+                            <td className="border-0"></td>
+                            {flight.dailyData.map((data: any, dayIndex: number) => (
+                              <td key={dayIndex} className="border border-gray-300 px-2 py-2 text-center text-sm bg-red-50">
+                                {data.used}
+                              </td>
+                            ))}
+                            <td className="border border-gray-300 px-4 py-2 text-center text-sm font-semibold bg-red-50">
+                              {flight.totalUsed}
+                            </td>
+                          </tr>
+                          <tr key={`${flightIndex}-available`} className="bg-white">
+                            <td className="border-0"></td>
+                            <td colSpan={calendarDays.length + 2} className="border border-gray-300 px-2 py-1 text-xs text-gray-600 bg-green-50">
+                              Available
+                            </td>
+                          </tr>
+                          <tr key={`${flightIndex}-available-data`}>
+                            <td className="border-0"></td>
+                            {flight.dailyData.map((data: any, dayIndex: number) => (
+                              <td key={dayIndex} className="border border-gray-300 px-2 py-2 text-center text-sm">
+                                {data.available}
+                              </td>
+                            ))}
+                            <td className="border border-gray-300 px-4 py-2 text-center text-sm font-semibold">
+                              {flight.totalAvailable}
+                            </td>
+                          </tr>
+                          <tr key={`${flightIndex}-over`} className="bg-gray-50">
+                            <td className="border-0"></td>
+                            <td colSpan={calendarDays.length + 2} className="border border-gray-300 px-2 py-1 text-xs text-gray-600">
+                              Over
+                            </td>
+                          </tr>
+                          <tr key={`${flightIndex}-spacer`}>
+                            <td colSpan={calendarDays.length + 3} className="h-4"></td>
+                          </tr>
+                        </>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {allotmentData.length === 0 && !allotmentLoading && allotmentFromDate && allotmentToDate && (
+                <div className="bg-white p-12 rounded-lg shadow text-center">
+                  <p className="text-gray-600">No allotment data found for the selected period</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* PNL Report Tab Content */}
+          {activeTab === 'pnl' && (
+            <div className="space-y-6">
+              {/* Filters */}
+              <div className="bg-white p-6 rounded-lg shadow">
+                <h2 className="text-xl font-semibold mb-4">PNL (Passenger Name List) Report</h2>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Date
+                    </label>
+                    <input
+                      type="date"
+                      value={pnlDate}
+                      onChange={(e) => {
+                        setPnlDate(e.target.value);
+                        fetchFlightsByDate(e.target.value);
+                      }}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Flight Block
+                    </label>
+                    <select
+                      value={pnlFlightId}
+                      onChange={(e) => setPnlFlightId(e.target.value)}
+                      disabled={availableFlightsForDate.length === 0}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                    >
+                      <option value="">Select a flight</option>
+                      {availableFlightsForDate.map((flight) => (
+                        <option key={flight.id} value={flight.id}>
+                          {flight.flightNumber} - {flight.route} ({new Date(flight.departureTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-end">
+                    <button
+                      onClick={fetchPNLData}
+                      disabled={pnlLoading || !pnlFlightId}
+                      className={`w-full px-4 py-2 rounded-lg text-white ${
+                        pnlLoading || !pnlFlightId ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+                      }`}
+                    >
+                      {pnlLoading ? 'Loading...' : 'Generate Report'}
+                    </button>
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <button
+                      onClick={exportToExcel}
+                      disabled={pnlData.length === 0}
+                      className={`flex-1 px-4 py-2 rounded-lg text-white ${
+                        pnlData.length === 0 ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
+                      }`}
+                      title="Export to Excel (CSV)"
+                    >
+                      Excel
+                    </button>
+                    <button
+                      onClick={exportToTXT}
+                      disabled={pnlData.length === 0}
+                      className={`flex-1 px-4 py-2 rounded-lg text-white ${
+                        pnlData.length === 0 ? 'bg-gray-400 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700'
+                      }`}
+                      title="Export to TXT"
+                    >
+                      TXT
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* PNL Data Table */}
+              {pnlData.length > 0 && (
+                <div className="bg-white p-6 rounded-lg shadow overflow-x-auto">
+                  <h3 className="text-lg font-semibold mb-4">Passenger List</h3>
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Nr
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Title
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          First Name
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Last Name
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Date of Birth
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Booking Number
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Hotel
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {pnlData.map((passenger: any, index: number) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {index + 1}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {passenger.title}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {passenger.firstName}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {passenger.lastName}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {passenger.dateOfBirth || 'N/A'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {passenger.bookingNumber}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {passenger.hotel || 'N/A'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="mt-4 text-sm text-gray-600">
+                    Total Passengers: {pnlData.length}
+                  </div>
+                </div>
+              )}
+
+              {pnlData.length === 0 && !pnlLoading && pnlFlightId && (
+                <div className="bg-white p-12 rounded-lg shadow text-center">
+                  <p className="text-gray-600">No passengers found for the selected flight</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
     </AdminLayout>
   );
 }

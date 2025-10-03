@@ -63,7 +63,9 @@ export async function GET(request: NextRequest) {
           arrivalTime: flight.arrivalTime,
           departureAirport: flight.departureAirport,
           arrivalAirport: flight.arrivalAirport,
-          pricePerSeat: flight.pricePerSeat
+          pricePerSeat: flight.pricePerSeat,
+          totalSeats: flight.totalSeats,
+          availableSeats: flight.availableSeats
         };
       } else {
         flightBlocks[blockId].outbound = {
@@ -72,7 +74,9 @@ export async function GET(request: NextRequest) {
           arrivalTime: flight.arrivalTime,
           departureAirport: flight.departureAirport,
           arrivalAirport: flight.arrivalAirport,
-          pricePerSeat: flight.pricePerSeat
+          pricePerSeat: flight.pricePerSeat,
+          totalSeats: flight.totalSeats,
+          availableSeats: flight.availableSeats
         };
       }
     });

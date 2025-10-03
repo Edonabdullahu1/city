@@ -1,0 +1,170 @@
+{
+  "config": {
+    "configFile": "C:\\git\\city\\playwright.config.ts",
+    "rootDir": "C:/git/city/tests",
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {},
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "C:/git/city/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "C:/git/city/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "C:/git/city/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "C:/git/city/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "C:/git/city/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "C:/git/city/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "C:/git/city/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "mobile-chrome",
+        "name": "mobile-chrome",
+        "testDir": "C:/git/city/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/mobile-responsive.spec.ts",
+          "**/auth.spec.ts",
+          "**/booking.spec.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "C:/git/city/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "mobile-safari",
+        "name": "mobile-safari",
+        "testDir": "C:/git/city/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/mobile-responsive.spec.ts",
+          "**/auth.spec.ts",
+          "**/booking.spec.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "C:/git/city/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "tablet",
+        "name": "tablet",
+        "testDir": "C:/git/city/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/mobile-responsive.spec.ts",
+          "**/booking.spec.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "C:/git/city/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "business-rules",
+        "name": "business-rules",
+        "testDir": "C:/git/city/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/business-rules.spec.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "C:/git/city/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "error-handling",
+        "name": "error-handling",
+        "testDir": "C:/git/city/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/error-handling.spec.ts"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "shard": null,
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.55.0",
+    "workers": 10,
+    "webServer": {
+      "command": "npm run dev",
+      "url": "http://localhost:3000",
+      "reuseExistingServer": true
+    }
+  },
+  "suites": [],
+  "errors": [
+    {
+      "message": "Error: Process from config.webServer was not able to start. Exit code: 3221225794",
+      "stack": "Error: Process from config.webServer was not able to start. Exit code: 3221225794"
+    }
+  ],
+  "stats": {
+    "startTime": "2025-09-05T12:38:36.635Z",
+    "duration": 84630372.062,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

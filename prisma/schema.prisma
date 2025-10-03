@@ -13,6 +13,7 @@ model User {
   password  String
   firstName String?
   lastName  String?
+  phone     String?
   role      UserRole       @default(USER)
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
@@ -67,6 +68,7 @@ model Booking {
   checkOutDate      DateTime?
   destinationCityId String?
   notes             String?
+  passengerDetails  Json?
   expiresAt         DateTime?
   confirmedAt       DateTime?
   paidAt            DateTime?
@@ -87,27 +89,28 @@ model Booking {
 }
 
 model Hotel {
-  id            String         @id @default(cuid())
-  name          String
-  address       String
-  cityId        String
-  category      String
-  rating        Int
-  description   String
-  amenities     String[]
-  active        Boolean        @default(true)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  hotelId       Int?           @unique
-  slug          String?        @unique
-  primaryImage  String?
-  images        Json?          @default("[]")
-  blackoutDates BlackoutDate[]
-  bookings      HotelBooking[]
-  hotelPrices   HotelPrice[]
-  city          City           @relation("HotelCity", fields: [cityId], references: [id])
-  packages      Package[]
-  rooms         Room[]
+  id                        String           @id @default(cuid())
+  name                      String
+  address                   String
+  cityId                    String
+  category                  String
+  rating                    Int
+  description               String
+  amenities                 String[]
+  active                    Boolean          @default(true)
+  createdAt                 DateTime         @default(now())
+  updatedAt                 DateTime         @updatedAt
+  hotelId                   Int?             @unique
+  slug                      String?          @unique
+  primaryImage              String?
+  images                    Json?            @default("[]")
+  blackoutDates             BlackoutDate[]
+  bookings                  HotelBooking[]
+  hotelPrices               HotelPrice[]
+  city                      City             @relation("HotelCity", fields: [cityId], references: [id])
+  packages                  Package[]
+  rooms                     Room[]
+  selectedInPackageBookings PackageBooking[] @relation("PackageBookingSelectedHotel")
 
   @@index([cityId])
   @@index([hotelId])
@@ -534,6 +537,7 @@ model PackageBooking {
   id                   String   @id @default(cuid())
   bookingId            String
   packageId            String
+  selectedHotelId      String?
   adults               Int      @default(2)
   children             Int      @default(0)
   infants              Int      @default(0)
@@ -545,6 +549,7 @@ model PackageBooking {
   updatedAt            DateTime @updatedAt
   booking              Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   package              Package  @relation(fields: [packageId], references: [id])
+  selectedHotel        Hotel?   @relation("PackageBookingSelectedHotel", fields: [selectedHotelId], references: [id])
 
   @@map("package_bookings")
 }

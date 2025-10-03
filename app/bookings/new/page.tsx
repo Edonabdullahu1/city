@@ -3,9 +3,10 @@
 import { useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { Calendar, Users, Plane, Hotel, Car, Map, CreditCard, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, Users, Plane, Hotel, Car, Map, CreditCard, ChevronLeft, ChevronRight, Package } from 'lucide-react';
 import FlightSearch from '@/components/FlightSearch';
 import HotelSearch from '@/components/HotelSearch';
+import PackageSearch from '@/components/PackageSearch';
 
 interface BookingFormData {
   // Trip details
@@ -22,6 +23,7 @@ interface BookingFormData {
   customerPhone: string;
   
   // Services
+  packageId?: string;
   flightId?: string;
   hotelId?: string;
   transferId?: string;
@@ -32,6 +34,7 @@ interface BookingFormData {
 }
 
 const STEPS = [
+  { id: 0, name: 'Packages', icon: Package },
   { id: 1, name: 'Trip Details', icon: Calendar },
   { id: 2, name: 'Flights', icon: Plane },
   { id: 3, name: 'Hotels', icon: Hotel },
@@ -52,12 +55,15 @@ const DESTINATION_AIRPORTS: { [key: string]: string } = {
 export default function NewBookingPage() {
   const { data: session } = useSession();
   const router = useRouter();
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [selectedPackage, setSelectedPackage] = useState<any>(null);
+  const [selectedPackageHotel, setSelectedPackageHotel] = useState<any>(null);
   const [selectedFlight, setSelectedFlight] = useState<any>(null);
   const [selectedHotel, setSelectedHotel] = useState<any>(null);
   const [selectedRoom, setSelectedRoom] = useState<any>(null);
   const [skipFlight, setSkipFlight] = useState(false);
+  const [usePackage, setUsePackage] = useState(false);
   const [formData, setFormData] = useState<BookingFormData>({
     destination: '',
     checkIn: '',
@@ -73,13 +79,13 @@ export default function NewBookingPage() {
   });
 
   const handleNext = () => {
-    if (currentStep < STEPS.length) {
+    if (currentStep < STEPS.length - 1) {
       setCurrentStep(currentStep + 1);
     }
   };
 
   const handlePrevious = () => {
-    if (currentStep > 1) {
+    if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
     }
   };
@@ -87,23 +93,91 @@ export default function NewBookingPage() {
   const handleSubmit = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/bookings', {
+      // Calculate total amount from selected services
+      const calculateTotal = () => {
+        let total = 0;
+        
+        if (usePackage && selectedPackage && selectedPackageHotel) {
+          // For packages, use the combined total from package + selected hotel
+          const flightPrice = selectedPackage.flightPrice * (formData.adults + formData.children);
+          const hotelPrice = selectedPackageHotel.price;
+          const serviceCharge = selectedPackage.serviceCharge || 0;
+          const profitMargin = selectedPackage.profitMargin || 20;
+          const subtotal = flightPrice + hotelPrice + serviceCharge;
+          const profitAmount = subtotal * (profitMargin / 100);
+          total = (subtotal + profitAmount) * 100; // Convert to cents
+        } else {
+          // Individual services
+          if (selectedFlight) {
+            total += selectedFlight.price.amount * 100; // Convert to cents
+          }
+          if (selectedHotel && selectedRoom) {
+            const nights = Math.ceil(
+              (new Date(formData.checkOut).getTime() - new Date(formData.checkIn).getTime()) / 
+              (1000 * 60 * 60 * 24)
+            );
+            total += selectedRoom.pricePerNight * nights * 100; // Convert to cents
+          }
+        }
+        return total;
+      };
+
+      // Create soft booking
+      const softBookingData = {
+        totalAmount: calculateTotal(),
+        currency: 'EUR',
+        // Include customer details for guest bookings
+        customerName: formData.customerName,
+        customerEmail: formData.customerEmail,
+        customerPhone: formData.customerPhone,
+        checkInDate: formData.checkIn,
+        checkOutDate: formData.checkOut,
+        // Flight and hotel selections
+        ...(selectedFlight && { 
+          flightSelection: {
+            id: selectedFlight.id,
+            airline: selectedFlight.airline,
+            flightNumber: selectedFlight.flightNumber,
+            price: selectedFlight.price.amount
+          }
+        }),
+        ...(selectedHotel && selectedRoom && {
+          hotelSelection: {
+            hotelId: selectedHotel.id,
+            hotelName: selectedHotel.name,
+            roomId: selectedRoom.id,
+            roomType: selectedRoom.type,
+            pricePerNight: selectedRoom.pricePerNight
+          }
+        })
+      };
+
+      const response = await fetch('/api/bookings/soft-book', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(softBookingData)
       });
 
       if (response.ok) {
-        const booking = await response.json();
-        router.push(`/bookings/${booking.reservationCode}`);
+        const result = await response.json();
+        if (result.success) {
+          // Redirect to booking details page
+          router.push(`/bookings/${result.booking.reservationCode}`);
+        } else {
+          throw new Error(result.message || 'Failed to create booking');
+        }
       } else {
-        alert('Failed to create booking');
+        const errorData = await response.json().catch(() => ({ message: 'Failed to create booking' }));
+        throw new Error(errorData.message || 'Failed to create booking');
       }
     } catch (error) {
       console.error('Error creating booking:', error);
-      alert('An error occurred');
+      
+      // Show user-friendly error message
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      alert(`Booking failed: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -111,6 +185,146 @@ export default function NewBookingPage() {
 
   const renderStepContent = () => {
     switch (currentStep) {
+      case 0:
+        return (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold">Select Package or Custom Trip</h2>
+            
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-blue-800 mb-4">
+                Choose between our curated travel packages or build a custom trip step by step.
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button
+                  onClick={() => {
+                    setUsePackage(true);
+                    // Pre-fill some basic trip details to enable package search
+                    const today = new Date();
+                    const checkIn = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
+                    const checkOut = new Date(checkIn.getTime() + 3 * 24 * 60 * 60 * 1000); // 3 days later
+                    
+                    setFormData({
+                      ...formData,
+                      destination: formData.destination || 'paris',
+                      checkIn: formData.checkIn || checkIn.toISOString().split('T')[0],
+                      checkOut: formData.checkOut || checkOut.toISOString().split('T')[0],
+                      adults: formData.adults || 2,
+                      children: formData.children || 0,
+                      infants: formData.infants || 0
+                    });
+                  }}
+                  className={`p-4 border-2 rounded-lg text-left transition-all ${
+                    usePackage 
+                      ? 'border-blue-500 bg-blue-50' 
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center mb-2">
+                    <Package className="h-5 w-5 mr-2 text-blue-600" />
+                    <span className="font-semibold">Travel Packages</span>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    Complete packages with flights, hotels, and activities included
+                  </p>
+                </button>
+                
+                <button
+                  onClick={() => {
+                    setUsePackage(false);
+                    setSelectedPackage(null);
+                    setSelectedPackageHotel(null);
+                  }}
+                  className={`p-4 border-2 rounded-lg text-left transition-all ${
+                    !usePackage 
+                      ? 'border-blue-500 bg-blue-50' 
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center mb-2">
+                    <Calendar className="h-5 w-5 mr-2 text-green-600" />
+                    <span className="font-semibold">Custom Trip</span>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    Build your own trip by selecting flights, hotels, and extras individually
+                  </p>
+                </button>
+              </div>
+            </div>
+
+            {usePackage && (
+              <div className="mt-6">
+                <h3 className="text-lg font-semibold mb-4">Quick Trip Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Destination</label>
+                    <select
+                      className="w-full p-2 border rounded"
+                      value={formData.destination}
+                      onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
+                    >
+                      <option value="paris">Paris</option>
+                      <option value="london">London</option>
+                      <option value="rome">Rome</option>
+                      <option value="barcelona">Barcelona</option>
+                      <option value="amsterdam">Amsterdam</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Check-in</label>
+                    <input
+                      type="date"
+                      className="w-full p-2 border rounded"
+                      value={formData.checkIn}
+                      onChange={(e) => setFormData({ ...formData, checkIn: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Adults</label>
+                    <input
+                      type="number"
+                      min="1"
+                      className="w-full p-2 border rounded"
+                      value={formData.adults}
+                      onChange={(e) => setFormData({ ...formData, adults: parseInt(e.target.value) || 1 })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Children</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="w-full p-2 border rounded"
+                      value={formData.children}
+                      onChange={(e) => setFormData({ ...formData, children: parseInt(e.target.value) || 0 })}
+                    />
+                  </div>
+                </div>
+                
+                {formData.destination && formData.checkIn && (
+                  <PackageSearch
+                    destination={formData.destination}
+                    checkInDate={formData.checkIn}
+                    adults={formData.adults}
+                    children={formData.children}
+                    selectedPackageId={selectedPackage?.id}
+                    onSelect={({ package: pkg, selectedHotel }) => {
+                      setSelectedPackage(pkg);
+                      setSelectedPackageHotel(selectedHotel);
+                      setFormData({
+                        ...formData,
+                        packageId: pkg.id,
+                        // Calculate check-out date based on package nights
+                        checkOut: new Date(new Date(formData.checkIn).getTime() + pkg.nights * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+                      });
+                    }}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        );
+
       case 1:
         return (
           <div className="space-y-6">
@@ -570,9 +784,9 @@ export default function NewBookingPage() {
         <div className="flex justify-between mt-6">
           <button
             onClick={handlePrevious}
-            disabled={currentStep === 1}
+            disabled={currentStep === 0}
             className={`flex items-center px-6 py-3 rounded-lg ${
-              currentStep === 1
+              currentStep === 0
                 ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 : 'bg-gray-600 text-white hover:bg-gray-700'
             }`}
@@ -581,10 +795,15 @@ export default function NewBookingPage() {
             Previous
           </button>
 
-          {currentStep < STEPS.length && (
+          {currentStep < STEPS.length - 1 && (
             <button
               onClick={handleNext}
-              className="flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              disabled={currentStep === 0 && !usePackage && !selectedPackage}
+              className={`flex items-center px-6 py-3 rounded-lg ${
+                (currentStep === 0 && !usePackage && !selectedPackage)
+                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
             >
               Next
               <ChevronRight className="ml-2" size={20} />

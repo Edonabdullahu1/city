@@ -65,6 +65,92 @@ export async function GET(request: NextRequest) {
               lastName: true,
               email: true
             }
+          },
+          flights: true,
+          hotels: true,
+          transfers: true,
+          excursions: true,
+          packages: {
+            include: {
+              selectedHotel: {
+                select: {
+                  id: true,
+                  name: true,
+                  city: {
+                    select: {
+                      name: true,
+                      country: {
+                        select: {
+                          name: true
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              package: {
+                select: {
+                  id: true,
+                  name: true,
+                  hotel: {
+                    select: {
+                      id: true,
+                      name: true,
+                      city: {
+                        select: {
+                          name: true,
+                          country: {
+                            select: {
+                              name: true
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  departureFlight: {
+                    select: {
+                      id: true,
+                      flightNumber: true,
+                      departureTime: true,
+                      arrivalTime: true,
+                      departureAirport: {
+                        select: {
+                          code: true,
+                          name: true
+                        }
+                      },
+                      arrivalAirport: {
+                        select: {
+                          code: true,
+                          name: true
+                        }
+                      }
+                    }
+                  },
+                  returnFlight: {
+                    select: {
+                      id: true,
+                      flightNumber: true,
+                      departureTime: true,
+                      arrivalTime: true,
+                      departureAirport: {
+                        select: {
+                          code: true,
+                          name: true
+                        }
+                      },
+                      arrivalAirport: {
+                        select: {
+                          code: true,
+                          name: true
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }),
@@ -110,21 +196,47 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user || session.user.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();
-    const { id, status, notes } = body;
+    const { id, status, notes, passengerDetails } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Booking ID required' }, { status: 400 });
     }
 
+    // If cancelling a booking, release the seats back to the flights
+    if (status === 'CANCELLED') {
+      // Get current booking with flight details
+      const currentBooking = await prisma.booking.findUnique({
+        where: { id },
+        include: {
+          flights: true
+        }
+      });
+
+      if (currentBooking && currentBooking.status !== 'CANCELLED' && currentBooking.flights.length > 0) {
+        // Release seats for each flight booking
+        for (const flightBooking of currentBooking.flights) {
+          await prisma.flight.update({
+            where: { id: flightBooking.flightId },
+            data: {
+              availableSeats: {
+                increment: flightBooking.passengers
+              }
+            }
+          });
+        }
+      }
+    }
+
     const updateData: any = {};
     if (status) updateData.status = status;
     if (notes !== undefined) updateData.notes = notes;
+    if (passengerDetails !== undefined) updateData.passengerDetails = passengerDetails;
 
     const updatedBooking = await prisma.booking.update({
       where: { id },
@@ -133,7 +245,8 @@ export async function PUT(request: NextRequest) {
         user: {
           select: {
             id: true,
-            name: true,
+            firstName: true,
+            lastName: true,
             email: true
           }
         }

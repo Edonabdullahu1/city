@@ -23,6 +23,7 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      testMatch: ['**/*.spec.ts', '!**/mobile-responsive.spec.ts']
     },
     {
       name: 'firefox',
