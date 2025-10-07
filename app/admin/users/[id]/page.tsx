@@ -28,6 +28,8 @@ export default function AdminUserDetailPage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailSuccess, setEmailSuccess] = useState('');
 
   useEffect(() => {
     if (status === 'loading') return;
@@ -105,6 +107,33 @@ export default function AdminUserDetailPage() {
     }
   };
 
+  const handleSendWelcomeEmail = async () => {
+    if (!user) return;
+
+    setSendingEmail(true);
+    setError('');
+    setEmailSuccess('');
+
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/send-welcome-email`, {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send email');
+      }
+
+      setEmailSuccess('Welcome email sent successfully!');
+      setTimeout(() => setEmailSuccess(''), 5000);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
   return (
     <AdminLayout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -118,7 +147,29 @@ export default function AdminUserDetailPage() {
           <h1 className="text-3xl font-bold text-gray-900">User Details</h1>
         </div>
 
+        {emailSuccess && (
+          <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-4">
+            <p className="text-green-800">{emailSuccess}</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-red-800">{error}</p>
+          </div>
+        )}
+
         <div className="bg-white shadow-lg rounded-lg overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+            <h2 className="text-xl font-semibold text-gray-900">User Information</h2>
+            <button
+              onClick={handleSendWelcomeEmail}
+              disabled={sendingEmail}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              {sendingEmail ? 'Sending...' : 'Send Welcome Email'}
+            </button>
+          </div>
           <div className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>

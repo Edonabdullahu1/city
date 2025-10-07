@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { BookingStatus } from '@prisma/client';
+import { sendBookingConfirmationEmail, sendCancellationEmail, sendPaymentReceivedEmail } from '@/lib/email';
 
 export async function GET(request: NextRequest) {
   try {
@@ -208,6 +209,15 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Booking ID required' }, { status: 400 });
     }
 
+    // Get current booking to check for status changes
+    const currentBooking = await prisma.booking.findUnique({
+      where: { id },
+      select: { status: true }
+    });
+
+    const oldStatus = currentBooking?.status;
+    const statusChanged = status && oldStatus && status !== oldStatus;
+
     // If cancelling a booking, release the seats back to the flights
     if (status === 'CANCELLED') {
       // Get current booking with flight details
@@ -249,9 +259,58 @@ export async function PUT(request: NextRequest) {
             lastName: true,
             email: true
           }
+        },
+        packages: {
+          include: {
+            package: {
+              include: {
+                city: true
+              }
+            }
+          }
         }
       }
     });
+
+    // Send emails based on status changes
+    if (statusChanged && updatedBooking.customerEmail) {
+      const emailData = {
+        to: updatedBooking.customerEmail,
+        bookingCode: updatedBooking.reservationCode,
+        customerName: updatedBooking.customerName || 'Customer',
+        checkInDate: updatedBooking.checkInDate?.toISOString() || new Date().toISOString(),
+        checkOutDate: updatedBooking.checkOutDate?.toISOString() || new Date().toISOString(),
+        destination: updatedBooking.packages[0]?.package?.destination?.name || 'Your Destination',
+        totalAmount: updatedBooking.totalAmount,
+        bookingId: updatedBooking.id,
+      };
+
+      try {
+        if (status === 'CONFIRMED') {
+          await sendBookingConfirmationEmail(emailData);
+          console.log(`[EMAIL] Booking confirmation sent to ${updatedBooking.customerEmail}`);
+        } else if (status === 'PAID') {
+          await sendPaymentReceivedEmail({
+            to: emailData.to,
+            bookingCode: emailData.bookingCode,
+            customerName: emailData.customerName,
+            totalAmount: emailData.totalAmount,
+          });
+          console.log(`[EMAIL] Payment received email sent to ${updatedBooking.customerEmail}`);
+        } else if (status === 'CANCELLED') {
+          await sendCancellationEmail({
+            to: emailData.to,
+            bookingCode: emailData.bookingCode,
+            customerName: emailData.customerName,
+            reason: notes || 'Booking cancelled by admin',
+          });
+          console.log(`[EMAIL] Cancellation email sent to ${updatedBooking.customerEmail}`);
+        }
+      } catch (emailError) {
+        console.error('[EMAIL] Failed to send status change email:', emailError);
+        // Don't fail the request if email fails
+      }
+    }
 
     return NextResponse.json(updatedBooking);
 

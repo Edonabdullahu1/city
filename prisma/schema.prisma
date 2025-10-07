@@ -566,3 +566,16 @@ enum BookingStatus {
   PAID
   CANCELLED
 }
+
+model EmailTemplate {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  subject     String
+  htmlContent String   @db.Text
+  variables   String[] // Array of available variables like {{bookingCode}}, {{customerName}}
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("email_templates")
+}

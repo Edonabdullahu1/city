@@ -975,7 +975,7 @@ export default function AdminEditBookingPage() {
                 </button>
               </div>
 
-              {booking.packages && booking.packages.length > 0 && (booking.packages[0].selectedHotel || booking.packages[0].package?.hotel) ? (
+              {(booking.packages && booking.packages.length > 0 && (booking.packages[0].selectedHotel || booking.packages[0].package?.hotel)) ? (
                 (() => {
                   const hotel = booking.packages[0].selectedHotel || booking.packages[0].package?.hotel;
                   return (

@@ -20,7 +20,9 @@ import {
   Phone,
   Upload,
   FileText,
-  CalendarPlus
+  CalendarPlus,
+  ArrowLeft,
+  Home
 } from 'lucide-react';
 
 interface Booking {
@@ -370,8 +372,60 @@ export default function BookingDetailPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold text-blue-600">Max Travel</h1>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => router.push('/')}
+                className="text-gray-600 hover:text-gray-900"
+              >
+                Home
+              </button>
+              <button
+                onClick={() => router.push('/user/bookings')}
+                className="text-gray-600 hover:text-gray-900"
+              >
+                My Bookings
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        {/* Breadcrumbs */}
+        <div className="mb-4 flex items-center gap-2 text-sm">
+          <button
+            onClick={() => router.push('/')}
+            className="text-gray-600 hover:text-gray-900 flex items-center gap-1"
+          >
+            <Home className="h-4 w-4" />
+            Home
+          </button>
+          <span className="text-gray-400">/</span>
+          <button
+            onClick={() => router.push('/user/bookings')}
+            className="text-gray-600 hover:text-gray-900"
+          >
+            My Bookings
+          </button>
+          <span className="text-gray-400">/</span>
+          <span className="text-gray-900 font-medium">{booking.reservationCode}</span>
+        </div>
+
+        {/* Back Button */}
+        <button
+          onClick={() => router.back()}
+          className="mb-4 flex items-center gap-2 text-gray-600 hover:text-gray-900"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </button>
+
         {/* Header */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="flex justify-between items-start">

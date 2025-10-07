@@ -11,7 +11,7 @@ export async function GET(
     const session = await getServerSession(authOptions);
     const { bookingId } = await params;
 
-    if (!session?.user || (session.user.role !== 'ADMIN' && session.user.role !== 'AGENT')) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -57,6 +57,11 @@ export async function GET(
 
     if (!booking) {
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
+    }
+
+    // Verify user has access to this booking
+    if (session.user.role !== 'ADMIN' && session.user.role !== 'AGENT' && booking.userId !== session.user.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
     // Get hotel info (prioritize selectedHotel, fallback to package hotel)
@@ -135,6 +140,7 @@ export async function GET(
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hotel Voucher - ${booking.reservationCode}</title>
     <style>
         @page {
@@ -153,11 +159,13 @@ export async function GET(
             font-size: 11pt;
             line-height: 1.4;
             color: #333;
+            background: #f5f5f5;
         }
 
         .voucher {
             max-width: 210mm;
             margin: 0 auto;
+            background: white;
         }
 
         .header {
@@ -324,9 +332,74 @@ export async function GET(
             color: #1e3c72;
         }
 
+        @media screen and (max-width: 768px) {
+            body {
+                font-size: 10pt;
+                background: white;
+            }
+
+            .voucher {
+                max-width: 100%;
+                padding: 0;
+            }
+
+            .header {
+                padding: 15px 10px;
+            }
+
+            .header h1 {
+                font-size: 18pt;
+            }
+
+            .reservation-code {
+                font-size: 16pt;
+                padding: 10px;
+            }
+
+            .info-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+
+            .section-title {
+                font-size: 11pt;
+            }
+
+            .label, .value {
+                font-size: 10pt;
+            }
+
+            .hotel-name {
+                font-size: 14pt;
+            }
+
+            .payment-box {
+                padding: 12px;
+            }
+
+            .additional-info {
+                padding: 12px;
+            }
+
+            .footer button {
+                padding: 10px 18px;
+                font-size: 10pt;
+                width: 48%;
+            }
+
+            .footer {
+                padding: 15px 10px;
+            }
+        }
+
         @media print {
             body {
                 margin: 0;
+                padding: 0;
+                background: white;
+            }
+
+            .voucher {
                 padding: 0;
             }
 

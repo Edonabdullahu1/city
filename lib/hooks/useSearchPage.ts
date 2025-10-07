@@ -64,12 +64,14 @@ export function useSearchPage() {
     }
   };
 
-  const getPackagePrice = (pkg: Package) => {
+  const getPackagePrice = (pkg: Package): number => {
     // Find matching price for the selected occupancy
-    const matchingPrice = pkg.packagePrices.find(
+    const matchingPrice = pkg.packagePrices?.find(
       price => price.adults === adults && price.children === children
     );
-    return matchingPrice?.totalPrice || pkg.basePrice;
+    const priceInCents = matchingPrice?.totalPrice || pkg.basePrice || 0;
+    // Convert cents to euros
+    return priceInCents / 100;
   };
 
   return {

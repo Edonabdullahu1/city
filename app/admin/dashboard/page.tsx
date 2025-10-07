@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { signOut } from 'next-auth/react';
 import Link from 'next/link';
-import { 
-  Users, 
-  Calendar, 
-  DollarSign, 
+import {
+  Users,
+  Calendar,
+  DollarSign,
   TrendingUp,
   Plane,
   Hotel,
@@ -18,7 +18,8 @@ import {
   Menu,
   X,
   Bell,
-  Settings
+  Settings,
+  Mail
 } from 'lucide-react';
 
 interface DashboardStats {
@@ -144,6 +145,10 @@ export default function AdminDashboard() {
           <Link href="/admin/users" className="flex items-center px-6 py-3 text-gray-400 hover:text-white hover:bg-gray-800">
             <Users className="h-5 w-5 mr-3" />
             Users
+          </Link>
+          <Link href="/admin/email-templates" className="flex items-center px-6 py-3 text-gray-400 hover:text-white hover:bg-gray-800">
+            <Mail className="h-5 w-5 mr-3" />
+            Email Templates
           </Link>
           <Link href="/admin/settings" className="flex items-center px-6 py-3 text-gray-400 hover:text-white hover:bg-gray-800">
             <Settings className="h-5 w-5 mr-3" />

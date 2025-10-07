@@ -50,11 +50,12 @@ export default function PackageDetailsPage({ slug }: PackageDetailsPageProps) {
   // Collapsible sections state
   const [expandedSections, setExpandedSections] = useState({
     description: true,
-    flights: false,
-    hotels: false,
-    planProgram: false,
-    included: false,
-    useful: false
+    flights: true,
+    flightDetails: true,
+    hotels: true,
+    planProgram: true,
+    included: true,
+    useful: true
   });
 
   const toggleSection = (section: keyof typeof expandedSections) => {
@@ -259,17 +260,17 @@ export default function PackageDetailsPage({ slug }: PackageDetailsPageProps) {
                   }`}
                 >
                   {isSoldOut && (
-                    <div className="absolute top-2 right-2 bg-red-600 text-white px-2 py-1 rounded text-xs font-semibold">
+                    <div className="absolute -top-1 -right-1 bg-red-600 text-white px-2 py-1 rounded text-xs font-semibold z-10">
                       SOLD OUT
                     </div>
                   )}
                   {isSelected && !isSoldOut && (
-                    <div className="absolute top-2 right-2 bg-blue-600 text-white rounded-full p-1">
-                      <Check className="w-4 h-4" />
+                    <div className="absolute -top-2 -right-2 bg-blue-600 text-white rounded-full p-1 shadow-md z-10">
+                      <Check className="w-5 h-5" />
                     </div>
                   )}
 
-                  <div className="mb-2">
+                  <div className="mb-2 pr-8">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs text-gray-600">Departure</span>
                       <span className="text-sm font-medium">
@@ -394,6 +395,114 @@ export default function PackageDetailsPage({ slug }: PackageDetailsPageProps) {
         )}
       </div>
 
+      {/* Flight Details */}
+      <div className="bg-white mb-2">
+        <button
+          onClick={() => toggleSection('flightDetails')}
+          className="w-full flex items-center justify-between p-4 border-b"
+        >
+          <div className="flex items-center gap-2">
+            <Plane className="w-5 h-5 text-blue-600" />
+            <h3 className="font-semibold text-gray-900">Flight Details</h3>
+          </div>
+          {expandedSections.flightDetails ? (
+            <ChevronUp className="w-5 h-5 text-gray-500" />
+          ) : (
+            <ChevronDown className="w-5 h-5 text-gray-500" />
+          )}
+        </button>
+
+        {expandedSections.flightDetails && selectedFlightBlock && (
+          <div className="p-4 space-y-4">
+            {/* Outbound Flight */}
+            <div>
+              <h4 className="font-semibold text-gray-900 mb-2">Outbound Flight</h4>
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <p className="font-medium mb-1">{selectedFlightBlock.outbound.flightNumber}</p>
+                <div className="flex justify-between items-center text-sm">
+                  <div>
+                    <p className="text-gray-600">{selectedFlightBlock.outbound.departureAirport.code}</p>
+                    <p className="font-semibold">
+                      {new Date(selectedFlightBlock.outbound.departureTime).toLocaleTimeString('en-GB', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(selectedFlightBlock.outbound.departureTime).toLocaleDateString('en-GB', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric'
+                      })}
+                    </p>
+                  </div>
+                  <Plane className="w-5 h-5 text-gray-400" />
+                  <div className="text-right">
+                    <p className="text-gray-600">{selectedFlightBlock.outbound.arrivalAirport.code}</p>
+                    <p className="font-semibold">
+                      {new Date(selectedFlightBlock.outbound.arrivalTime).toLocaleTimeString('en-GB', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(selectedFlightBlock.outbound.arrivalTime).toLocaleDateString('en-GB', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric'
+                      })}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Return Flight */}
+            <div>
+              <h4 className="font-semibold text-gray-900 mb-2">Return Flight</h4>
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <p className="font-medium mb-1">{selectedFlightBlock.return.flightNumber}</p>
+                <div className="flex justify-between items-center text-sm">
+                  <div>
+                    <p className="text-gray-600">{selectedFlightBlock.return.departureAirport.code}</p>
+                    <p className="font-semibold">
+                      {new Date(selectedFlightBlock.return.departureTime).toLocaleTimeString('en-GB', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(selectedFlightBlock.return.departureTime).toLocaleDateString('en-GB', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric'
+                      })}
+                    </p>
+                  </div>
+                  <Plane className="w-5 h-5 text-gray-400" />
+                  <div className="text-right">
+                    <p className="text-gray-600">{selectedFlightBlock.return.arrivalAirport.code}</p>
+                    <p className="font-semibold">
+                      {new Date(selectedFlightBlock.return.arrivalTime).toLocaleTimeString('en-GB', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(selectedFlightBlock.return.arrivalTime).toLocaleDateString('en-GB', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric'
+                      })}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Package Overview */}
       <div className="bg-white mb-2">
         <button
@@ -418,7 +527,7 @@ export default function PackageDetailsPage({ slug }: PackageDetailsPageProps) {
 
       {/* Plan and Program */}
       {packageData.planAndProgram && (
-        <div className="bg-white mb-2">
+        <div className="bg-white mb-2 mb-32">
           <button
             onClick={() => toggleSection('planProgram')}
             className="w-full flex items-center justify-between p-4 border-b"
@@ -432,7 +541,7 @@ export default function PackageDetailsPage({ slug }: PackageDetailsPageProps) {
           </button>
           {expandedSections.planProgram && (
             <div
-              className="p-4 prose-sm max-w-none text-gray-700"
+              className="p-4 pb-8 prose-sm max-w-none text-gray-700"
               dangerouslySetInnerHTML={{ __html: packageData.planAndProgram }}
             />
           )}
@@ -441,7 +550,7 @@ export default function PackageDetailsPage({ slug }: PackageDetailsPageProps) {
 
       {/* What is Included */}
       {packageData.whatIsIncluded && (
-        <div className="bg-white mb-2">
+        <div className="bg-white mb-2 mb-32">
           <button
             onClick={() => toggleSection('included')}
             className="w-full flex items-center justify-between p-4 border-b"
@@ -455,7 +564,7 @@ export default function PackageDetailsPage({ slug }: PackageDetailsPageProps) {
           </button>
           {expandedSections.included && (
             <div
-              className="p-4 prose-sm max-w-none text-gray-700"
+              className="p-4 pb-8 prose-sm max-w-none text-gray-700"
               dangerouslySetInnerHTML={{ __html: packageData.whatIsIncluded }}
             />
           )}
@@ -464,7 +573,7 @@ export default function PackageDetailsPage({ slug }: PackageDetailsPageProps) {
 
       {/* Useful Information */}
       {packageData.usefulInformation && (
-        <div className="bg-white mb-2">
+        <div className="bg-white mb-2 mb-32">
           <button
             onClick={() => toggleSection('useful')}
             className="w-full flex items-center justify-between p-4 border-b"
@@ -478,7 +587,7 @@ export default function PackageDetailsPage({ slug }: PackageDetailsPageProps) {
           </button>
           {expandedSections.useful && (
             <div
-              className="p-4 prose-sm max-w-none text-gray-700"
+              className="p-4 pb-8 prose-sm max-w-none text-gray-700"
               dangerouslySetInnerHTML={{ __html: packageData.usefulInformation }}
             />
           )}
@@ -491,22 +600,18 @@ export default function PackageDetailsPage({ slug }: PackageDetailsPageProps) {
           {/* Price Breakdown Summary */}
           {selectedPrice && (
             <div className="mb-3">
-              <div className="flex justify-between items-baseline mb-1">
-                <span className="text-xs text-gray-600">
-                  {selectedOccupancy.adults} adult{selectedOccupancy.adults > 1 ? 's' : ''}
-                  {selectedPrice.payingChildrenCount > 0 &&
-                    ` + ${selectedPrice.payingChildrenCount} child${selectedPrice.payingChildrenCount > 1 ? 'ren' : ''}`}
-                  {selectedPrice.infantsCount > 0 &&
-                    ` + ${selectedPrice.infantsCount} infant${selectedPrice.infantsCount > 1 ? 's' : ''} (free)`}
-                </span>
-                <span className="text-xs text-gray-600">{nights} nights</span>
-              </div>
+              {selectedHotel && (
+                <p className="text-base text-gray-900 mb-1">
+                  {nights} nights @ <span className="font-semibold">{selectedHotel.name}</span>
+                </p>
+              )}
               <div className="flex justify-between items-center">
                 <div>
-                  <span className="text-sm text-gray-600">Total Price</span>
-                  {selectedHotel && (
-                    <p className="text-xs text-gray-500">{selectedHotel.name}</p>
-                  )}
+                  <span className="text-sm text-gray-600">Total Price for </span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {selectedOccupancy.adults} adult{selectedOccupancy.adults > 1 ? 's' : ''}
+                    {selectedOccupancy.children > 0 && ` and ${selectedOccupancy.children} ${selectedOccupancy.children > 1 ? 'kids' : 'kid'}`}
+                  </span>
                 </div>
                 <span className="text-2xl font-bold text-blue-600">
                   €{Number(selectedPrice.totalPrice).toFixed(2)}
@@ -527,7 +632,7 @@ export default function PackageDetailsPage({ slug }: PackageDetailsPageProps) {
             disabled={packageData.packagePrices.length > 0 && !selectedPrice}
             className={`w-full py-3 rounded-lg font-semibold transition-colors ${
               packageData.packagePrices.length === 0 || selectedPrice
-                ? 'bg-blue-600 text-white active:bg-blue-700'
+                ? 'bg-blue-500 text-white active:bg-blue-600'
                 : 'bg-gray-300 text-gray-500'
             }`}
           >

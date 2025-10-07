@@ -16,10 +16,10 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get('offset') || '0');
 
     // Get user's bookings
-    const result = await BookingService.getUserBookings(session.user.id, limit, offset);
+    const bookings = await BookingService.getUserBookings(session.user.id, { limit, offset });
 
     // Transform bookings for user dashboard with full service details
-    const transformedBookings = result.bookings.map(booking => ({
+    const transformedBookings = bookings.map(booking => ({
       id: booking.id,
       reservationCode: booking.reservationCode,
       status: booking.status,
@@ -69,8 +69,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       bookings: transformedBookings,
-      total: result.total,
-      hasMore: result.hasMore
+      total: bookings.length,
+      hasMore: bookings.length === limit
     });
 
   } catch (error) {

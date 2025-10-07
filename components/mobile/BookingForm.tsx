@@ -3,6 +3,7 @@
 import { useBookingForm, PassengerDetails } from '@/lib/hooks/useBookingForm';
 import { COUNTRY_CODES } from '@/lib/utils/countryCodes';
 import { User, Phone, Mail, Check, ChevronLeft, ChevronRight, Star, MapPin } from 'lucide-react';
+import { useState } from 'react';
 
 const STEPS = [
   { id: 1, name: 'Passengers', icon: User },
@@ -32,6 +33,9 @@ export default function MobileBookingForm() {
     validateStep,
     router
   } = useBookingForm();
+
+  const [countrySearch, setCountrySearch] = useState('');
+  const [showCountryDropdown, setShowCountryDropdown] = useState(false);
 
   if (!bookingData.packageId) {
     return (
@@ -167,17 +171,66 @@ export default function MobileBookingForm() {
                   Phone Number *
                 </label>
                 <div className="flex gap-2">
-                  <select
-                    value={contactDetails.countryCode}
-                    onChange={(e) => setContactDetails({ ...contactDetails, countryCode: e.target.value })}
-                    className="w-28 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-base"
-                  >
-                    {COUNTRY_CODES.map((country, index) => (
-                      <option key={`${country.code}-${index}`} value={country.code}>
-                        {country.flag} {country.code}
-                      </option>
-                    ))}
-                  </select>
+                  {/* Searchable Country Code */}
+                  <div className="relative w-32">
+                    <input
+                      type="text"
+                      value={countrySearch || contactDetails.countryCode}
+                      onChange={(e) => {
+                        setCountrySearch(e.target.value);
+                        setShowCountryDropdown(true);
+                      }}
+                      onFocus={() => setShowCountryDropdown(true)}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-base"
+                      placeholder="+383"
+                    />
+
+                    {showCountryDropdown && (
+                      <>
+                        <div className="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto mt-1">
+                          {COUNTRY_CODES
+                            .filter(country =>
+                              !countrySearch ||
+                              country.country.toLowerCase().includes(countrySearch.toLowerCase()) ||
+                              country.code.includes(countrySearch)
+                            )
+                            .slice(0, 10)
+                            .map((country, index) => (
+                              <button
+                                key={`${country.code}-${index}`}
+                                type="button"
+                                onClick={() => {
+                                  setContactDetails({ ...contactDetails, countryCode: country.code });
+                                  setShowCountryDropdown(false);
+                                  setCountrySearch('');
+                                }}
+                                className={`w-full text-left p-2 hover:bg-gray-100 flex items-center gap-2 text-sm ${
+                                  contactDetails.countryCode === country.code ? 'bg-blue-50' : ''
+                                }`}
+                              >
+                                <span>{country.flag}</span>
+                                <span className="font-medium">{country.code}</span>
+                                <span className="text-gray-600 text-xs truncate">{country.country}</span>
+                              </button>
+                            ))}
+                        </div>
+                        {/* Overlay */}
+                        <div
+                          className="fixed inset-0 z-40"
+                          onClick={() => {
+                            setShowCountryDropdown(false);
+                            setCountrySearch('');
+                          }}
+                        />
+                      </>
+                    )}
+
+                    {!showCountryDropdown && contactDetails.countryCode && (
+                      <div className="absolute right-2 top-1/2 transform -translate-y-1/2 text-sm">
+                        {COUNTRY_CODES.find(c => c.code === contactDetails.countryCode)?.flag}
+                      </div>
+                    )}
+                  </div>
 
                   <input
                     type="tel"
@@ -335,37 +388,27 @@ export default function MobileBookingForm() {
               )}
 
               {/* Flight Information */}
-              {(packageData?.flights?.length > 0 || packageData?.departureFlight || packageData?.returnFlight) && (
+              {(packageData?.departureFlight || packageData?.returnFlight) && (
                 <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-2">Flights</h3>
+                  <h3 className="text-base font-semibold text-gray-900 mb-3">Flights</h3>
                   <div className="space-y-3">
-                    {packageData?.flights?.map((flight: any, index: number) => (
-                      <div key={flight.id || index} className="border-l-2 border-blue-500 pl-3">
-                        <p className="text-xs font-medium text-gray-900">
-                          {flight.flightNumber} - {flight.direction === 'outbound' ? 'Outbound' : 'Return'}
-                        </p>
-                        <p className="text-xs text-gray-600">
-                          {flight.departureAirport?.code || 'N/A'} → {flight.arrivalAirport?.code || 'N/A'}
-                        </p>
-                      </div>
-                    ))}
                     {packageData?.departureFlight && (
-                      <div className="border-l-2 border-blue-500 pl-3">
-                        <p className="text-xs font-medium text-gray-900">
+                      <div className="border-l-4 border-blue-500 pl-3 py-1">
+                        <p className="text-sm font-semibold text-gray-900">
                           {packageData.departureFlight.flightNumber} - Outbound
                         </p>
-                        <p className="text-xs text-gray-600">
-                          {packageData.departureFlight.departureAirport?.code || 'N/A'} → {packageData.departureFlight.arrivalAirport?.code || 'N/A'}
+                        <p className="text-sm text-gray-600">
+                          {packageData.departureFlight.departureAirport?.code || 'SKP'} → {packageData.departureFlight.arrivalAirport?.code || 'MLA'}
                         </p>
                       </div>
                     )}
                     {packageData?.returnFlight && (
-                      <div className="border-l-2 border-green-500 pl-3">
-                        <p className="text-xs font-medium text-gray-900">
+                      <div className="border-l-4 border-green-500 pl-3 py-1">
+                        <p className="text-sm font-semibold text-gray-900">
                           {packageData.returnFlight.flightNumber} - Return
                         </p>
-                        <p className="text-xs text-gray-600">
-                          {packageData.returnFlight.departureAirport?.code || 'N/A'} → {packageData.returnFlight.arrivalAirport?.code || 'N/A'}
+                        <p className="text-sm text-gray-600">
+                          {packageData.returnFlight.departureAirport?.code || 'MLA'} → {packageData.returnFlight.arrivalAirport?.code || 'SKP'}
                         </p>
                       </div>
                     )}
@@ -375,14 +418,14 @@ export default function MobileBookingForm() {
 
               {/* Passengers */}
               <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-900 mb-2">Passengers</h3>
+                <h3 className="text-base font-semibold text-gray-900 mb-3">Passengers</h3>
                 <div className="space-y-2">
                   {passengers.map((passenger, index) => (
-                    <div key={index} className="flex justify-between text-xs">
-                      <span className="text-gray-900">
+                    <div key={index} className="flex justify-between text-sm py-1">
+                      <span className="text-gray-900 font-medium">
                         {passenger.title} {passenger.firstName} {passenger.lastName}
                       </span>
-                      <span className="text-gray-500">
+                      <span className="text-gray-600">
                         {passenger.type} ({calculateAge(passenger.dateOfBirth)}y)
                       </span>
                     </div>
@@ -392,15 +435,15 @@ export default function MobileBookingForm() {
 
               {/* Contact */}
               <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-900 mb-2">Contact</h3>
-                <div className="space-y-1 text-xs">
+                <h3 className="text-base font-semibold text-gray-900 mb-3">Contact</h3>
+                <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Email:</span>
-                    <span className="text-gray-900">{contactDetails.email}</span>
+                    <span className="text-gray-900 font-medium">{contactDetails.email}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Phone:</span>
-                    <span className="text-gray-900">{contactDetails.countryCode} {contactDetails.phone}</span>
+                    <span className="text-gray-900 font-medium">{contactDetails.countryCode} {contactDetails.phone}</span>
                   </div>
                 </div>
               </div>
@@ -408,12 +451,12 @@ export default function MobileBookingForm() {
               {/* Price */}
               <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-gray-900">Total Amount:</span>
-                  <span className="text-xl font-bold text-blue-600">
+                  <span className="text-base font-semibold text-gray-900">Total Amount:</span>
+                  <span className="text-2xl font-bold text-blue-600">
                     €{parseFloat(bookingData.price).toFixed(2)}
                   </span>
                 </div>
-                <p className="text-xs text-gray-600 mt-1">
+                <p className="text-sm text-gray-600 mt-1">
                   {bookingData.adults} adult{bookingData.adults > 1 ? 's' : ''}
                   {bookingData.children > 0 && `, ${bookingData.children} child${bookingData.children > 1 ? 'ren' : ''}`}
                 </p>

@@ -68,22 +68,37 @@ export function useHomePage() {
     }
   };
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchData.destinationId || !searchData.departureDate) {
       alert('Please select a destination and date');
       return;
     }
 
-    // Navigate to search results page
-    const params = new URLSearchParams({
-      city: searchData.destinationId,
-      date: searchData.departureDate,
-      adults: searchData.adults.toString(),
-      children: searchData.children.toString()
-    });
+    // Fetch the package for this city and date
+    try {
+      const params = new URLSearchParams({
+        cityId: searchData.destinationId,
+        date: searchData.departureDate,
+        adults: searchData.adults.toString(),
+        children: searchData.children.toString()
+      });
 
-    router.push(`/search?${params.toString()}`);
+      const response = await fetch(`/api/public/search?${params}`);
+      if (response.ok) {
+        const packages = await response.json();
+        if (packages.length > 0) {
+          // Redirect directly to the package details page
+          const packageSlug = packages[0].slug || packages[0].id;
+          router.push(`/packages/${packageSlug}`);
+        } else {
+          alert('No packages found for this destination and date');
+        }
+      }
+    } catch (error) {
+      console.error('Error searching for packages:', error);
+      alert('Error searching for packages');
+    }
   };
 
   const updateSearchData = (updates: Partial<SearchData>) => {

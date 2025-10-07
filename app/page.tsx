@@ -141,12 +141,12 @@ export default function Home() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {cities.slice(0, 6).map(city => (
-              <Link 
+              <Link
                 key={city.id}
                 href={`/destinations/${city.slug || city.id}`}
                 className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow overflow-hidden group"
               >
-                <div className="h-48 relative overflow-hidden">
+                <div className="h-64 relative overflow-hidden">
                   {city.profileImage ? (
                     <Image
                       src={city.profileImage}
@@ -158,9 +158,9 @@ export default function Home() {
                     <div className="w-full h-full bg-gradient-to-br from-blue-400 to-blue-600"></div>
                   )}
                 </div>
-                <div className="p-4">
-                  <h3 className="text-xl font-semibold text-gray-900">{city.name}</h3>
-                  <p className="text-gray-600">{city.country.name}</p>
+                <div className="p-6">
+                  <h3 className="text-2xl font-bold text-gray-900 mb-1">{city.name}</h3>
+                  <p className="text-gray-600 text-lg">{city.country.name}</p>
                 </div>
               </Link>
             ))}

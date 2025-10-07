@@ -11,7 +11,7 @@ export async function GET(
     const session = await getServerSession(authOptions);
     const { bookingId } = await params;
 
-    if (!session?.user || (session.user.role !== 'ADMIN' && session.user.role !== 'AGENT')) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -44,6 +44,11 @@ export async function GET(
 
     if (!booking) {
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
+    }
+
+    // Verify user has access to this booking
+    if (session.user.role !== 'ADMIN' && session.user.role !== 'AGENT' && booking.userId !== session.user.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
     // Extract passengers from passengerDetails
@@ -237,6 +242,7 @@ export async function GET(
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Flight Tickets - ${booking.reservationCode}</title>
     <style>
         @page {
@@ -459,10 +465,81 @@ export async function GET(
             margin: 3px 0;
         }
 
+        @media screen and (max-width: 768px) {
+            body {
+                font-size: 10pt;
+                background: white;
+            }
+
+            .ticket-page {
+                width: 100%;
+                min-height: auto;
+                padding: 0;
+            }
+
+            .ticket-header {
+                padding: 15px 10px;
+            }
+
+            .agency-name, .ticket-title {
+                font-size: 16pt;
+            }
+
+            .ticket-body {
+                padding: 0 10px;
+            }
+
+            .section {
+                padding: 10px;
+                margin-bottom: 10px;
+            }
+
+            .section-title {
+                font-size: 11pt;
+                padding: 8px 10px;
+                margin: -10px -10px 10px -10px;
+            }
+
+            .passenger-name {
+                font-size: 14pt;
+            }
+
+            .flight-info-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 12px;
+            }
+
+            .flight-info-label {
+                font-size: 8pt;
+            }
+
+            .flight-info-value {
+                font-size: 10pt;
+            }
+
+            .notice-box, .info-box {
+                padding: 12px;
+                margin-bottom: 12px;
+            }
+
+            .notice-box h4, .info-box h4 {
+                font-size: 10pt;
+            }
+
+            .notice-box p, .info-box li {
+                font-size: 8.5pt;
+            }
+
+            .ticket-footer {
+                font-size: 7pt;
+            }
+        }
+
         @media print {
             body {
                 margin: 0;
                 padding: 0;
+                background: white;
             }
 
             .ticket-page {

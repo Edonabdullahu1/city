@@ -3,6 +3,9 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useHomePage } from '@/lib/hooks/useHomePage';
+import { useState } from 'react';
+import { Menu, X, Home, MapPin, User } from 'lucide-react';
+import { useSession } from 'next-auth/react';
 
 export default function MobileHomePage() {
   const {
@@ -13,12 +16,74 @@ export default function MobileHomePage() {
     handleSearch
   } = useHomePage();
 
+  const [menuOpen, setMenuOpen] = useState(false);
+  const { data: session } = useSession();
+
   return (
     <div className="min-h-screen bg-white">
       {/* Mobile Header - Compact */}
-      <header className="bg-blue-600 text-white p-4 sticky top-0 z-10">
-        <h1 className="text-xl font-bold">City Breaks</h1>
+      <header className="bg-blue-600 text-white p-4 sticky top-0 z-20">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold">Max Travel</h1>
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="p-2 hover:bg-blue-700 rounded"
+          >
+            {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </button>
+        </div>
       </header>
+
+      {/* Mobile Menu */}
+      {menuOpen && (
+        <div className="fixed top-16 left-0 right-0 bg-white shadow-lg z-10 border-t">
+          <nav className="py-2">
+            <Link
+              href="/"
+              onClick={() => setMenuOpen(false)}
+              className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 border-b"
+            >
+              <Home className="h-5 w-5 text-gray-600" />
+              <span className="text-gray-900">Home</span>
+            </Link>
+            <Link
+              href="/destinations"
+              onClick={() => setMenuOpen(false)}
+              className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 border-b"
+            >
+              <MapPin className="h-5 w-5 text-gray-600" />
+              <span className="text-gray-900">Destinations</span>
+            </Link>
+            {session ? (
+              <Link
+                href="/user/bookings"
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 border-b"
+              >
+                <User className="h-5 w-5 text-gray-600" />
+                <span className="text-gray-900">My Bookings</span>
+              </Link>
+            ) : (
+              <Link
+                href="/login"
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 border-b"
+              >
+                <User className="h-5 w-5 text-gray-600" />
+                <span className="text-gray-900">Login</span>
+              </Link>
+            )}
+          </nav>
+        </div>
+      )}
+
+      {/* Overlay to close menu when clicking outside */}
+      {menuOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-25 z-0"
+          onClick={() => setMenuOpen(false)}
+        />
+      )}
 
       {/* Hero Section - Mobile Optimized */}
       <section className="px-4 py-6 bg-gradient-to-b from-blue-50 to-white">
@@ -135,31 +200,23 @@ export default function MobileHomePage() {
               href={`/destinations/${city.slug || city.id}`}
               className="block bg-white rounded-lg shadow active:shadow-md transition-shadow overflow-hidden"
             >
-              <div className="flex">
-                {/* Image - Square */}
-                <div className="w-24 h-24 relative flex-shrink-0">
-                  {city.profileImage ? (
-                    <Image
-                      src={city.profileImage}
-                      alt={city.name}
-                      fill
-                      className="object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-blue-400 to-blue-600"></div>
-                  )}
-                </div>
-                {/* Content */}
-                <div className="flex-1 p-3 flex flex-col justify-center">
-                  <h3 className="text-lg font-semibold text-gray-900">{city.name}</h3>
-                  <p className="text-sm text-gray-600">{city.country.name}</p>
-                </div>
-                {/* Arrow */}
-                <div className="flex items-center pr-3">
-                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
+              {/* Large Image on Top */}
+              <div className="w-full h-48 relative">
+                {city.profileImage ? (
+                  <Image
+                    src={city.profileImage}
+                    alt={city.name}
+                    fill
+                    className="object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-blue-400 to-blue-600"></div>
+                )}
+              </div>
+              {/* Title Below Image */}
+              <div className="p-4">
+                <h3 className="text-xl font-bold text-gray-900 mb-1">{city.name}</h3>
+                <p className="text-base text-gray-600">{city.country.name}</p>
               </div>
             </Link>
           ))}

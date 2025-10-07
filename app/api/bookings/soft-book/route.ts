@@ -4,6 +4,8 @@ import { BookingService } from '@/lib/services/bookingService';
 import { z } from 'zod';
 import { withErrorHandler, ValidationError } from '@/lib/utils/errorHandler';
 import prisma from '@/lib/prisma';
+import bcrypt from 'bcryptjs';
+import { sendWelcomeEmail, sendConfirmationEmail } from '@/lib/email';
 
 const softBookingSchema = z.object({
   totalAmount: z.number().min(0, 'Total amount must be positive'),
@@ -18,7 +20,7 @@ const softBookingSchema = z.object({
     firstName: z.string(),
     lastName: z.string(),
     dateOfBirth: z.string(),
-    gender: z.string(),
+    gender: z.string().optional(),
     type: z.string(),
     age: z.number()
   })).optional(),
@@ -32,6 +34,7 @@ const softBookingSchema = z.object({
   customerName: z.string().optional(),
   customerEmail: z.string().email().optional(),
   customerPhone: z.string().optional(),
+  customerPassword: z.string().min(6).optional(),
   checkInDate: z.string().optional(),
   checkOutDate: z.string().optional(),
   // Service selections
@@ -56,38 +59,87 @@ export const POST = withErrorHandler(async (request: NextRequest, context: any) 
   // Validate input
   const validatedInput = softBookingSchema.safeParse(body);
   if (!validatedInput.success) {
+    console.error('[VALIDATION ERROR] Zod validation failed:', JSON.stringify(validatedInput.error.flatten(), null, 2));
+    console.error('[VALIDATION ERROR] Received body:', JSON.stringify(body, null, 2));
     throw new ValidationError('Invalid booking data', validatedInput.error.flatten().fieldErrors);
   }
 
-  const { 
-    totalAmount, 
-    currency, 
-    expiresAt, 
+  const {
+    totalAmount,
+    currency,
+    expiresAt,
     packageId,
     hotelId,
     passengers = [],
     adults,
     children,
     contactDetails,
-    customerName, 
-    customerEmail, 
+    customerName,
+    customerEmail,
     customerPhone,
+    customerPassword,
     checkInDate,
     checkOutDate,
     flightSelection,
     hotelSelection
   } = validatedInput.data;
 
-  // For demo purposes, we'll use the guest user we just created
-  // In production, this should require authentication or handle guest bookings properly
+  // Handle user authentication/creation
   let userId = context?.user?.id;
-  
+
   if (!userId) {
-    // Try to find existing guest user or use a specific guest user ID
-    const guestUser = await prisma.user.findFirst({
-      where: { email: 'guest@example.com' }
-    });
-    userId = guestUser?.id || 'cmf6ua2ph0004q4fnidtnyxx9'; // Fallback to known guest user ID
+    // Check if user already exists by email
+    if (customerEmail) {
+      const existingUser = await prisma.user.findUnique({
+        where: { email: customerEmail }
+      });
+
+      if (existingUser) {
+        userId = existingUser.id;
+      } else {
+        // Create new user account
+        // Split customerName into firstName and lastName
+        const nameParts = (customerName || 'Guest User').split(' ');
+        const firstName = nameParts[0] || 'Guest';
+        const lastName = nameParts.slice(1).join(' ') || 'User';
+
+        // Hash password if provided, otherwise use empty string
+        const hashedPassword = customerPassword
+          ? await bcrypt.hash(customerPassword, 10)
+          : '';
+
+        const newUser = await prisma.user.create({
+          data: {
+            email: customerEmail,
+            firstName: firstName,
+            lastName: lastName,
+            password: hashedPassword,
+            phone: customerPhone || null,
+            role: 'USER' // Must be uppercase enum value
+          }
+        });
+        userId = newUser.id;
+        console.log(`[BOOKING] Created new user: ${newUser.email} (ID: ${newUser.id})`);
+
+        // Send welcome email to new user
+        try {
+          await sendWelcomeEmail({
+            to: newUser.email,
+            customerName: `${newUser.firstName} ${newUser.lastName}`,
+            customerEmail: newUser.email,
+          });
+          console.log(`[EMAIL] Welcome email sent to ${newUser.email}`);
+        } catch (emailError) {
+          console.error(`[EMAIL] Failed to send welcome email to ${newUser.email}:`, emailError);
+        }
+      }
+    } else {
+      // No email provided - use fallback guest user
+      const guestUser = await prisma.user.findFirst({
+        where: { email: 'guest@example.com' }
+      });
+      userId = guestUser?.id || 'cmf6ua2ph0004q4fnidtnyxx9';
+    }
   }
 
   // Get package details if packageId is provided
@@ -239,6 +291,24 @@ export const POST = withErrorHandler(async (request: NextRequest, context: any) 
     checkOutDate: finalCheckOutDate,
     passengerDetails: passengerDetails
   });
+
+  // Send new booking email notification
+  if (booking.customerEmail) {
+    try {
+      await sendConfirmationEmail({
+        to: booking.customerEmail,
+        bookingCode: booking.reservationCode,
+        customerName: booking.customerName || 'Customer',
+        checkInDate: booking.checkInDate?.toISOString() || new Date().toISOString(),
+        checkOutDate: booking.checkOutDate?.toISOString() || new Date().toISOString(),
+        destination: packageData?.destination?.name || 'Your Destination',
+        totalAmount: booking.totalAmount,
+      });
+      console.log(`[EMAIL] New booking email sent to ${booking.customerEmail}`);
+    } catch (emailError) {
+      console.error(`[EMAIL] Failed to send booking email to ${booking.customerEmail}:`, emailError);
+    }
+  }
 
   return NextResponse.json(
     {

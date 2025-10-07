@@ -224,6 +224,7 @@ export function useBookingForm() {
         customerName: passengers[0] ? `${passengers[0].firstName} ${passengers[0].lastName}` : '',
         customerEmail: contactDetails.email,
         customerPhone: `${contactDetails.countryCode}${contactDetails.phone}`,
+        customerPassword: contactDetails.password || undefined, // Only include if provided
         adults: bookingData.adults,
         children: bookingData.children
       };
