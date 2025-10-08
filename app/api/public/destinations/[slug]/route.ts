@@ -48,6 +48,8 @@ export async function GET(
             },
             packagePrices: {
               select: {
+                adults: true,
+                children: true,
                 totalPrice: true
               },
               orderBy: {
@@ -144,7 +146,7 @@ export async function GET(
     // Convert Decimal to number for JSON serialization
     const formattedData = {
       ...cityData,
-      packagePrices: cityData.packages.map(pkg => ({
+      packages: cityData.packages.map(pkg => ({
         ...pkg,
         packagePrices: pkg.packagePrices.map(price => ({
           ...price,

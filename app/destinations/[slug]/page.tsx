@@ -32,6 +32,8 @@ interface Package {
     departureTime: string;
   };
   packagePrices: Array<{
+    adults: number;
+    children: number;
     totalPrice: number;
   }>;
 }
@@ -297,6 +299,7 @@ export default function DestinationDetailPage({
                               fill
                               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                               className="object-cover"
+                              unoptimized={pkg.primaryImage.startsWith('/uploads/')}
                             />
                           ) : (
                             <div className="w-full h-full bg-gradient-to-br from-blue-400 to-blue-600" />
@@ -354,6 +357,7 @@ export default function DestinationDetailPage({
                             fill
                             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                             className="object-cover"
+                            unoptimized={hotel.primaryImage.startsWith('/uploads/')}
                           />
                         ) : (
                           <div className="w-full h-full bg-gradient-to-br from-amber-400 to-amber-600" />
@@ -445,6 +449,7 @@ export default function DestinationDetailPage({
                         fill
                         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                         className="object-cover"
+                        unoptimized={pkg.primaryImage.startsWith('/uploads/')}
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-blue-400 to-blue-600" />
@@ -497,6 +502,7 @@ export default function DestinationDetailPage({
                       fill
                       sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                       className="object-cover"
+                      unoptimized={hotel.primaryImage.startsWith('/uploads/')}
                     />
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-amber-400 to-amber-600" />

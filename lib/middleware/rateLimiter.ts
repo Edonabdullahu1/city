@@ -26,7 +26,7 @@ export class RateLimiter {
       windowMs: config.windowMs,
       maxAttempts: config.maxAttempts,
       blockDurationMs: config.blockDurationMs || config.windowMs * 2,
-      keyGenerator: config.keyGenerator || this.defaultKeyGenerator,
+      keyGenerator: config.keyGenerator || this.defaultKeyGenerator.bind(this),
       message: config.message || 'Too many requests. Please try again later.',
       skipSuccessfulRequests: config.skipSuccessfulRequests || false,
     };
