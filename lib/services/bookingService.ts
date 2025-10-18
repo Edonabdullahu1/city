@@ -83,23 +83,29 @@ export class BookingService {
   /**
    * Create a soft booking with automatic expiration after 3 hours
    * Uses proper transaction management to ensure data integrity
+   *
+   * IMPORTANT: All price values (totalAmount, flight prices, hotel prices, etc.)
+   * must be provided in CENTS. The service does not perform euro-to-cent conversion.
    */
   static async createSoftBooking(data: {
     userId: string;
     packageId?: string;
     selectedHotelId?: string;
     flightBookings?: Array<{
-      flightId: string;
+      flightId?: string; // Optional - only for database flights (block seats)
       flightNumber?: string;
       origin: string;
       destination: string;
       departureDate: Date;
+      arrivalDate?: Date; // Arrival time for this flight segment
       passengers: number;
       class: string;
       price: number;
     }>;
     hotelBookings?: Array<{
       hotelId: string;
+      hotelName?: string; // FIX: Add optional hotelName field
+      location?: string; // FIX: Add optional location field
       roomType: string;
       checkIn: Date;
       checkOut: Date;
@@ -133,6 +139,7 @@ export class BookingService {
     customerEmail?: string;
     customerPhone?: string;
     passengerDetails?: any;
+    notes?: string; // FIX: Add notes field for storing booking tokens and metadata
     expiresAt?: Date;
   }): Promise<Booking> {
     
@@ -146,15 +153,19 @@ export class BookingService {
       })();
 
       // 2. Check availability for all services before booking
+      // Only check database flights (block seats) - skip external flights (Kiwi.com, etc.)
       if (data.flightBookings) {
         for (const flightBooking of data.flightBookings) {
-          const flight = await tx.flight.findUnique({
-            where: { id: flightBooking.flightId },
-            select: { availableSeats: true, totalSeats: true }
-          });
+          // Only check availability if this is a database flight (has flightId)
+          if (flightBooking.flightId) {
+            const flight = await tx.flight.findUnique({
+              where: { id: flightBooking.flightId },
+              select: { availableSeats: true, totalSeats: true }
+            });
 
-          if (!flight || flight.availableSeats < flightBooking.passengers) {
-            throw new Error(`Insufficient seats available for flight ${flightBooking.flightId}`);
+            if (!flight || flight.availableSeats < flightBooking.passengers) {
+              throw new Error(`Insufficient seats available for flight ${flightBooking.flightId}`);
+            }
           }
         }
       }
@@ -193,6 +204,7 @@ export class BookingService {
           checkInDate: data.checkInDate,
           checkOutDate: data.checkOutDate,
           passengerDetails: data.passengerDetails,
+          notes: data.notes, // FIX: Add notes field (contains booking token for Kiwi.com bookings)
           expiresAt,
           createdAt: new Date(),
           updatedAt: new Date()
@@ -224,26 +236,30 @@ export class BookingService {
           await tx.flightBooking.create({
             data: {
               bookingId: booking.id,
-              flightId: flightBooking.flightId,
+              flightId: flightBooking.flightId || null, // Null for external flights
               flightNumber: flightBooking.flightNumber,
               origin: flightBooking.origin,
               destination: flightBooking.destination,
               departureDate: flightBooking.departureDate,
+              arrivalDate: flightBooking.arrivalDate, // Arrival time for this flight segment
               passengers: flightBooking.passengers,
               class: flightBooking.class,
-              price: Math.round(flightBooking.price * 100),
+              // All prices stored in CENTS - already converted by caller
+              price: flightBooking.price,
             }
           });
 
-          // Reserve seats (soft hold)
-          await tx.flight.update({
-            where: { id: flightBooking.flightId },
-            data: {
-              availableSeats: {
-                decrement: flightBooking.passengers
+          // Reserve seats (soft hold) - only for database flights
+          if (flightBooking.flightId) {
+            await tx.flight.update({
+              where: { id: flightBooking.flightId },
+              data: {
+                availableSeats: {
+                  decrement: flightBooking.passengers
+                }
               }
-            }
-          });
+            });
+          }
         }
       }
 
@@ -253,15 +269,16 @@ export class BookingService {
             data: {
               bookingId: booking.id,
               hotelId: hotelBooking.hotelId,
-              hotelName: '', // Will be populated by trigger or separate query
+              hotelName: hotelBooking.hotelName || '', // FIX: Use provided hotelName or empty string
               roomType: hotelBooking.roomType,
-              location: '', // Will be populated
+              location: hotelBooking.location || '', // FIX: Use provided location or empty string
               checkIn: hotelBooking.checkIn,
               checkOut: hotelBooking.checkOut,
               occupancy: hotelBooking.occupancy,
               nights: hotelBooking.nights,
-              pricePerNight: Math.round(hotelBooking.pricePerNight * 100),
-              totalPrice: Math.round(hotelBooking.totalPrice * 100),
+              // All prices stored in CENTS - already converted by caller
+              pricePerNight: hotelBooking.pricePerNight,
+              totalPrice: hotelBooking.totalPrice,
             }
           });
 
@@ -290,7 +307,8 @@ export class BookingService {
               transferTime: '09:00', // Default time, should be parameterized
               vehicleType: 'Standard', // Should be from transfer data
               passengers: transferBooking.passengers,
-              price: Math.round(transferBooking.price * 100),
+              // All prices stored in CENTS - already converted by caller
+              price: transferBooking.price,
             }
           });
         }
@@ -308,8 +326,9 @@ export class BookingService {
               excursionTime: '10:00', // Default time
               duration: 4, // Default duration in hours
               participants: excursionBooking.participants,
-              price: Math.round(excursionBooking.price * 100),
-              totalPrice: Math.round(excursionBooking.price * excursionBooking.participants * 100),
+              // All prices stored in CENTS - already converted by caller
+              price: excursionBooking.price,
+              totalPrice: excursionBooking.price * excursionBooking.participants,
             }
           });
         }
@@ -385,7 +404,10 @@ export class BookingService {
    */
   static async cancelBooking(reservationCode: string): Promise<Booking> {
     const booking = await prisma.booking.findUnique({
-      where: { reservationCode }
+      where: { reservationCode },
+      include: {
+        flights: true
+      }
     });
 
     if (!booking) {
@@ -396,19 +418,44 @@ export class BookingService {
       throw new Error('Booking is already cancelled');
     }
 
-    return await prisma.booking.update({
-      where: { reservationCode },
-      data: {
-        status: BookingStatus.CANCELLED,
-        updatedAt: new Date()
-      },
-      include: {
-        user: true,
-        flights: true,
-        hotels: true,
-        transfers: true,
-        excursions: true
+    // Use transaction to ensure seats are released atomically
+    return await prisma.$transaction(async (tx) => {
+      // Release flight seats for block seat flights
+      for (const flightBooking of booking.flights) {
+        // Get the full flight details to check if it's a block seat
+        const flight = await tx.flight.findUnique({
+          where: { id: flightBooking.flightId }
+        });
+
+        if (flight && flight.isBlockSeat) {
+          await tx.flight.update({
+            where: { id: flightBooking.flightId },
+            data: {
+              availableSeats: {
+                increment: flightBooking.passengers
+              }
+            }
+          });
+          console.log(`[CANCEL] Released ${flightBooking.passengers} seats for flight ${flightBooking.flightId}`);
+        }
       }
+
+      // Update booking status to cancelled
+      return await tx.booking.update({
+        where: { reservationCode },
+        data: {
+          status: BookingStatus.CANCELLED,
+          cancelledAt: new Date(),
+          updatedAt: new Date()
+        },
+        include: {
+          user: true,
+          flights: true,
+          hotels: true,
+          transfers: true,
+          excursions: true
+        }
+      });
     });
   }
 
@@ -488,21 +535,48 @@ export class BookingService {
       skip: options?.offset
     });
 
-    // Filter out expired soft bookings
+    // Filter out expired soft bookings and release inventory
     return bookings.filter(booking => {
       if (
         booking.status === BookingStatus.SOFT &&
         booking.expiresAt &&
         booking.expiresAt < new Date()
       ) {
-        // Mark as cancelled in background (non-blocking)
-        prisma.booking.update({
-          where: { id: booking.id },
-          data: {
-            status: BookingStatus.CANCELLED,
-            updatedAt: new Date()
+        // Release inventory and mark as cancelled in background (non-blocking)
+        (async () => {
+          try {
+            // Release flight seats for block seat flights
+            for (const flightBooking of booking.flights) {
+              // Get the full flight details to check if it's a block seat
+              const flight = await prisma.flight.findUnique({
+                where: { id: flightBooking.flightId }
+              });
+
+              if (flight && flight.isBlockSeat) {
+                await prisma.flight.update({
+                  where: { id: flightBooking.flightId },
+                  data: {
+                    availableSeats: {
+                      increment: flightBooking.passengers
+                    }
+                  }
+                });
+              }
+            }
+
+            // Mark booking as cancelled
+            await prisma.booking.update({
+              where: { id: booking.id },
+              data: {
+                status: BookingStatus.CANCELLED,
+                cancelledAt: new Date(),
+                updatedAt: new Date()
+              }
+            });
+          } catch (error) {
+            console.error('Error releasing inventory for expired booking:', booking.id, error);
           }
-        }).catch(console.error);
+        })();
 
         return false;
       }

@@ -19,6 +19,7 @@ export async function GET(
     const booking = await prisma.booking.findUnique({
       where: { reservationCode: bookingId },
       include: {
+        flights: true, // Include flight bookings for dynamic packages
         packages: {
           include: {
             package: {
@@ -226,7 +227,9 @@ export async function GET(
     // Generate tickets for all passengers - one page per passenger with both flights
     let ticketsHtml = '';
 
+    // Check if this is a package booking or dynamic booking
     if (booking.packages?.[0]?.package) {
+      // Package booking - use package's departure and return flights
       const pkg = booking.packages[0].package;
 
       // Generate one page per passenger showing both outbound and return flights
@@ -235,6 +238,44 @@ export async function GET(
           ticketsHtml += generatePassengerTicket(passenger, pkg.departureFlight, pkg.returnFlight);
         });
       }
+    } else if (booking.flights && booking.flights.length >= 2) {
+      // Dynamic booking - use flight bookings data
+      // Assuming first flight is outbound, second is return
+      const outboundFlight = booking.flights[0];
+      const returnFlight = booking.flights[1];
+
+      // Create flight objects compatible with the ticket generator
+      const departureFlight = {
+        flightNumber: outboundFlight.flightNumber || 'TBA',
+        departureTime: outboundFlight.departureDate,
+        arrivalTime: outboundFlight.arrivalDate || outboundFlight.departureDate, // Use stored arrival time or fallback to departure
+        departureAirport: {
+          code: outboundFlight.origin,
+          name: outboundFlight.origin
+        },
+        arrivalAirport: {
+          code: outboundFlight.destination,
+          name: outboundFlight.destination
+        }
+      };
+
+      const returnFlightData = {
+        flightNumber: returnFlight.flightNumber || 'TBA',
+        departureTime: returnFlight.departureDate,
+        arrivalTime: returnFlight.arrivalDate || returnFlight.departureDate, // Use stored arrival time or fallback to departure
+        departureAirport: {
+          code: returnFlight.origin,
+          name: returnFlight.origin
+        },
+        arrivalAirport: {
+          code: returnFlight.destination,
+          name: returnFlight.destination
+        }
+      };
+
+      passengerList.forEach(passenger => {
+        ticketsHtml += generatePassengerTicket(passenger, departureFlight, returnFlightData);
+      });
     }
 
     const html = `

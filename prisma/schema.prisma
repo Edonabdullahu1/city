@@ -8,19 +8,21 @@ datasource db {
 }
 
 model User {
-  id        String         @id @default(cuid())
-  email     String         @unique
-  password  String
-  firstName String?
-  lastName  String?
-  phone     String?
-  role      UserRole       @default(USER)
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
-  accounts  Account[]
-  auditLogs BookingAudit[]
-  bookings  Booking[]
-  sessions  Session[]
+  id                 String               @id @default(cuid())
+  email              String               @unique
+  password           String
+  firstName          String?
+  lastName           String?
+  phone              String?
+  role               UserRole             @default(USER)
+  active             Boolean              @default(true)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  accounts           Account[]
+  auditLogs          BookingAudit[]
+  bookings           Booking[]
+  sessions           Session[]
+  passwordResetTokens PasswordResetToken[]
 
   @@map("users")
 }
@@ -52,6 +54,19 @@ model Session {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("sessions")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("password_reset_tokens")
 }
 
 model Booking {
@@ -288,6 +303,7 @@ model FlightBooking {
   origin        String
   destination   String
   departureDate DateTime
+  arrivalDate   DateTime? // Arrival time for this flight segment
   returnDate    DateTime?
   passengers    Int       @default(1)
   class         String    @default("Economy")
@@ -482,27 +498,27 @@ model Package {
   hotelId           String
   roomId            String?
   nights            Int
-  basePrice         Int
-  maxOccupancy      Int                @default(2)
+  basePrice         Int       // Base price in CENTS
+  maxOccupancy      Int       @default(2)
   availableFrom     DateTime
   availableTo       DateTime
-  active            Boolean            @default(true)
-  featured          Boolean            @default(false)
-  includesTransfer  Boolean            @default(true)
+  active            Boolean   @default(true)
+  featured          Boolean   @default(false)
+  includesTransfer  Boolean   @default(true)
   transferId        String?
   highlights        String[]
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime @updatedAt
   flightBlockIds    Json?
   hotelIds          Json?
-  profitMargin      Decimal?           @db.Decimal(5, 2)
-  serviceCharge     Decimal?           @db.Decimal(10, 2)
-  slug              String?            @unique
+  profitMargin      Int?     // Stored as basis points (e.g., 1000 = 10%)
+  serviceCharge     Int?     // Service charge in CENTS
+  slug              String?  @unique
   primaryImage      String?
-  images            Json?              @default("[]")
+  images            Json?    @default("[]")
   info              String?
   planAndProgram    String?
-  shortDescription  String?            @db.VarChar(400)
+  shortDescription  String?  @db.VarChar(400)
   usefulInformation String?
   whatIsIncluded    String?
   packageBookings   PackageBooking[]
@@ -578,4 +594,363 @@ model EmailTemplate {
   updatedAt   DateTime @updatedAt
 
   @@map("email_templates")
+}
+
+model Page {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  content   Json     // Flexible JSON structure for page sections
+  published Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("pages")
+}
+
+model ReservationSequence {
+  id            Int      @id @default(1)
+  currentNumber Int      @default(0) @map("current_number")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  @@map("reservation_sequence")
+}
+
+// ============================================
+// SEO & Analytics Models
+// ============================================
+
+enum SeoEntityType {
+  PACKAGE
+  HOTEL
+  CITY
+  PAGE
+}
+
+model SeoMeta {
+  id              String        @id @default(cuid())
+  entityType      SeoEntityType
+  entityId        String
+  slug            String        @unique
+  metaTitle       String?       @db.VarChar(70)
+  metaDescription String?       @db.VarChar(160)
+  canonicalUrl    String?
+  noindex         Boolean       @default(false)
+  nofollow        Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([entityType, entityId])
+  @@index([slug])
+  @@index([entityType])
+  @@map("seo_meta")
+}
+
+model SocialMeta {
+  id                 String        @id @default(cuid())
+  entityType         SeoEntityType
+  entityId           String
+  ogTitle            String?       @db.VarChar(70)
+  ogDescription      String?       @db.VarChar(200)
+  ogImage            String?
+  twitterTitle       String?       @db.VarChar(70)
+  twitterDescription String?       @db.VarChar(200)
+  twitterImage       String?
+  ogType             String        @default("website")
+  twitterCard        String        @default("summary_large_image")
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@unique([entityType, entityId])
+  @@index([entityType])
+  @@map("social_meta")
+}
+
+model SchemaTemplate {
+  id           String        @id @default(cuid())
+  entityType   SeoEntityType
+  templateName String
+  jsonldTemplate Json
+  isDefault    Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@unique([entityType, templateName])
+  @@map("schema_templates")
+}
+
+enum ScriptProvider {
+  GOOGLE_ANALYTICS_4
+  GOOGLE_TAG_MANAGER
+  META_PIXEL
+  TIKTOK_PIXEL
+  HOTJAR
+  CUSTOM
+}
+
+enum ScriptPlacement {
+  HEAD_START
+  HEAD_END
+  BODY_START
+  BODY_END
+}
+
+model TrackingScript {
+  id              String          @id @default(cuid())
+  name            String
+  provider        ScriptProvider
+  scriptId        String?         // e.g., GA4 Measurement ID, GTM Container ID
+  scriptContent   String?         @db.Text // Custom script content
+  placement       ScriptPlacement @default(HEAD_END)
+  enabled         Boolean         @default(true)
+  conditions      Json?           // JSON conditions: {pages: [], excludePages: [], userRoles: []}
+  priority        Int             @default(100) // Lower numbers load first
+  description     String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([enabled])
+  @@index([provider])
+  @@index([placement])
+  @@map("tracking_scripts")
+}
+
+enum DeviceType {
+  MOBILE
+  DESKTOP
+}
+
+model PageSpeedSnapshot {
+  id                    String     @id @default(cuid())
+  url                   String
+  device                DeviceType @default(MOBILE)
+  performanceScore      Int?       // 0-100
+  accessibilityScore    Int?       // 0-100
+  bestPracticesScore    Int?       // 0-100
+  seoScore              Int?       // 0-100
+  // Core Web Vitals
+  lcp                   Float?     // Largest Contentful Paint (seconds)
+  fid                   Float?     // First Input Delay (milliseconds)
+  cls                   Float?     // Cumulative Layout Shift (score)
+  fcp                   Float?     // First Contentful Paint (seconds)
+  tti                   Float?     // Time to Interactive (seconds)
+  tbt                   Float?     // Total Blocking Time (milliseconds)
+  speedIndex            Float?     // Speed Index (seconds)
+  // Additional metrics
+  domSize               Int?
+  requestsCount         Int?
+  transferSize          Int?       // bytes
+  rawData               Json?      // Full PageSpeed API response
+  createdAt             DateTime   @default(now())
+
+  @@index([url])
+  @@index([device])
+  @@index([createdAt])
+  @@index([performanceScore])
+  @@map("pagespeed_snapshots")
+}
+
+model CrawlIssue {
+  id            String        @id @default(cuid())
+  url           String
+  issueType     CrawlIssueType
+  statusCode    Int?
+  message       String?       @db.Text
+  severity      IssueSeverity @default(MEDIUM)
+  resolved      Boolean       @default(false)
+  resolvedAt    DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([url])
+  @@index([issueType])
+  @@index([severity])
+  @@index([resolved])
+  @@map("crawl_issues")
+}
+
+enum CrawlIssueType {
+  NOT_FOUND         // 404
+  SERVER_ERROR      // 5xx
+  REDIRECT_CHAIN    // Multiple redirects
+  REDIRECT_LOOP     // Circular redirect
+  SLOW_RESPONSE     // > 3s
+  BROKEN_LINK       // Dead link
+  MISSING_META      // No meta tags
+  DUPLICATE_CONTENT // Same content
+}
+
+enum IssueSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model Keyword {
+  id              String           @id @default(cuid())
+  keyword         String
+  targetUrl       String?          // Optional: specific page to track
+  searchVolume    Int?             // Monthly search volume
+  difficulty      Int?             // Keyword difficulty (0-100)
+  priority        KeywordPriority  @default(MEDIUM)
+  category        String?          // Category/tag for grouping
+  notes           String?          @db.Text
+  enabled         Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  rankings        KeywordRanking[]
+
+  @@unique([keyword, targetUrl])
+  @@index([keyword])
+  @@index([enabled])
+  @@index([priority])
+  @@map("keywords")
+}
+
+model KeywordRanking {
+  id              String   @id @default(cuid())
+  keywordId       String
+  keyword         Keyword  @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+  position        Int?     // Ranking position (null if not ranking)
+  url             String?  // URL that's ranking for this keyword
+  searchEngine    String   @default("google") // google, bing, etc
+  location        String   @default("US") // Country/location
+  device          String   @default("desktop") // desktop, mobile
+  clicks          Int?     // From GSC
+  impressions     Int?     // From GSC
+  ctr             Float?   // Click-through rate
+  checkedAt       DateTime @default(now())
+
+  @@index([keywordId])
+  @@index([checkedAt])
+  @@index([position])
+  @@map("keyword_rankings")
+}
+
+enum KeywordPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum RedirectType {
+  PERMANENT   // 301
+  TEMPORARY   // 302
+}
+
+model Redirect {
+  id            String       @id @default(cuid())
+  sourcePath    String       @unique
+  destinationPath String
+  redirectType  RedirectType @default(PERMANENT)
+  description   String?
+  active        Boolean      @default(true)
+  hitCount      Int          @default(0)
+  lastHitAt     DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([sourcePath])
+  @@index([active])
+  @@map("redirects")
+}
+
+model RobotsConfig {
+  id                String   @id @default(cuid())
+  userAgent         String   @default("*")
+  allowPaths        String[] // Array of allowed paths
+  disallowPaths     String[] // Array of disallowed paths
+  crawlDelay        Int?     // Seconds between requests
+  sitemapUrl        String?  // Full sitemap URL
+  customRules       String?  @db.Text // Custom robots.txt rules
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("robots_config")
+}
+
+model SitemapConfig {
+  id                String   @id @default(cuid())
+  baseUrl           String   @default("https://city.maxtravel.al")
+  includePackages   Boolean  @default(true)
+  includeHotels     Boolean  @default(true)
+  includeCities     Boolean  @default(true)
+  includePages      Boolean  @default(true)
+  defaultChangeFreq String   @default("weekly") // always, hourly, daily, weekly, monthly, yearly, never
+  defaultPriority   Float    @default(0.5) // 0.0 to 1.0
+  excludePaths      String[] // Array of paths to exclude from sitemap
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("sitemap_config")
+}
+
+model SeoAlertConfig {
+  id                     String   @id @default(cuid())
+  enabled                Boolean  @default(true)
+  emailAlerts            Boolean  @default(true)
+  alertEmail             String?
+  slackAlerts            Boolean  @default(false)
+  slackWebhookUrl        String?
+
+  // Alert Thresholds
+  performanceThreshold   Int      @default(50) // Alert if performance score drops below this
+  crawlIssuesThreshold   Int      @default(5)  // Alert if unresolved issues exceed this
+  keywordDropThreshold   Int      @default(10) // Alert if keyword drops more than X positions
+  metaCoverageThreshold  Int      @default(70) // Alert if coverage drops below this percentage
+
+  // Digest Settings
+  weeklyDigest           Boolean  @default(true)
+  digestDay              String   @default("monday") // Day of week for digest
+  digestEmail            String?
+
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@map("seo_alert_config")
+}
+
+model SeoAlert {
+  id          String   @id @default(cuid())
+  alertType   String   // 'PERFORMANCE', 'CRAWL', 'KEYWORD', 'COVERAGE'
+  severity    String   // 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'
+  title       String
+  message     String   @db.Text
+  data        Json?    // Additional data about the alert
+  resolved    Boolean  @default(false)
+  resolvedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([alertType])
+  @@index([severity])
+  @@index([resolved])
+  @@map("seo_alerts")
+}
+
+model SystemSettings {
+  id                        String   @id @default(cuid())
+  companyName               String   @default("MXi Travel Agency")
+  companyEmail              String   @default("info@mxitravel.com")
+  companyPhone              String   @default("+355 69 123 4567")
+  companyAddress            String   @default("Tirana, Albania")
+  timezone                  String   @default("Europe/Tirane")
+  currency                  String   @default("EUR")
+  dateFormat                String   @default("DD/MM/YYYY")
+  bookingPrefix             String   @default("MXi")
+  bookingHoldTime           Int      @default(180)
+  autoConfirmBookings       Boolean  @default(false)
+  requireApproval           Boolean  @default(true)
+  maxBookingsPerDay         Int      @default(100)
+  maintenanceMode           Boolean  @default(false)
+  notificationEmail         String   @default("admin@mxitravel.com")
+  sendBookingNotifications  Boolean  @default(true)
+  sendPaymentNotifications  Boolean  @default(true)
+  defaultOgImage            String?  // Default Open Graph image for social sharing
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  @@map("system_settings")
 }
